@@ -1,122 +1,155 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:window_manager/window_manager.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+import 'src/api/catalog.dart';
+import 'src/api/client.dart';
+import 'src/auth/auth_controller.dart';
+import 'src/auth/biometric.dart';
+import 'src/auth/login_service.dart';
+import 'src/auth/token_store.dart';
+import 'src/stream/proxy.dart';
+import 'src/store/app_state.dart';
+import 'src/ui/app_shell.dart';
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+  final proxy = StreamProxy();
+  await proxy.start();
+
+  final settings = await AppSettings.load();
+  final auth = AuthController(
+    store: TokenStore(FlutterSecureKV()),
+    settings: settings,
+    biometrics: SystemBiometricGate(),
+    loginPerformer: (account, password) async {
+      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+        final r = await DesktopLoginService()
+            .login(account: account, password: password);
+        return r.token;
+      }
+      // Mobile path is widget-based; wired in LoginCard via MobileLoginSheet.
+      return null;
+    },
+  );
+  auth.init(); // silent; never blocks startup
+
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    await windowManager.ensureInitialized();
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(
+        title: '惠窗中小学端',
+        minimumSize: Size(960, 640),
+        size: Size(1366, 900),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      () async {
+        await windowManager.show();
+      },
     );
   }
+  final client = SmarteduClient();
+  final supportDir = await getApplicationSupportDirectory();
+  final app = AppController(
+    catalog: CatalogService(
+      cacheDir: Directory('${supportDir.path}/catalog'),
+      client: client,
+    ),
+    client: client,
+  );
+
+  // E2E hook: HC_E2E_RESID=<resId> auto-opens that lesson's player.
+  final e2eResId = Platform.environment['HC_E2E_RESID'];
+
+  runApp(HuichuangApp(
+    proxy: proxy,
+    auth: auth,
+    appController: app,
+    client: client,
+    e2eResId: e2eResId,
+  ));
 }
+class HuichuangApp extends StatelessWidget {
+  const HuichuangApp({
+    super.key,
+    required this.proxy,
+    required this.auth,
+    required this.appController,
+    required this.client,
+    this.e2eResId,
+  });
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+  final StreamProxy proxy;
+  final AuthController auth;
+  final AppController appController;
+  final SmarteduClient client;
+  final String? e2eResId;
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+    return MultiProvider(
+      providers: [
+        Provider<StreamProxy>.value(value: proxy),
+        Provider<SmarteduClient>.value(value: client),
+        ChangeNotifierProvider<AuthController>.value(value: auth),
+        ChangeNotifierProvider<AppController>.value(value: appController),
+      ],
+      child: MaterialApp(
+        onGenerateTitle: (context) => '惠窗中小学端',
+        debugShowCheckedModeBanner: false,
+        theme: _theme(Brightness.light),
+        darkTheme: _theme(Brightness.dark),
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: AppShell(e2eResId: e2eResId),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
+    );
+  }
+
+  ThemeData _theme(Brightness brightness) {
+    const accent = Color(0xFF2E5AAC);
+    final scheme = ColorScheme.fromSeed(
+      seedColor: accent,
+      brightness: brightness,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor:
+          brightness == Brightness.light ? const Color(0xFFFAFAF8) : null,
+      appBarTheme: AppBarTheme(
+        backgroundColor: brightness == Brightness.light
+            ? const Color(0xFFFAFAF8)
+            : scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        centerTitle: false,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+      cardTheme: const CardThemeData(
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
       ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: brightness == Brightness.light
+            ? const Color(0xFFFAFAF8)
+            : scheme.surface,
+        labelType: NavigationRailLabelType.all,
+        minWidth: 76,
+        useIndicator: true,
+      ),
+      splashFactory: InkSparkle.splashFactory,
     );
   }
 }

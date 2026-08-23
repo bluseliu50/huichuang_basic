@@ -191,6 +191,26 @@ class AuthController extends ChangeNotifier {
     return true;
   }
 
+  /// Completes a login whose token was captured by the webview UI
+  /// (mobile path); persists token and optionally credentials.
+  Future<void> acceptExternalToken(
+    TokenBundle t, {
+    String? account,
+    String? password,
+    bool remember = true,
+  }) async {
+    token = t;
+    status = AuthStatus.loggedIn;
+    await _store.saveToken(t);
+    if (remember && account != null && password != null) {
+      await _store.savePassword(account, password);
+      savedAccount = account;
+    }
+    _scheduleRenewal();
+    _fetchUser();
+    _notify();
+  }
+
   Future<void> logout({bool wipeCredentials = false}) async {
     _renewTimer?.cancel();
     await _store.clearToken();
@@ -221,6 +241,8 @@ class AuthController extends ChangeNotifier {
   Future<bool> biometricsAvailable() => _biometrics.isAvailable();
 
   bool get biometricProtect => _settings.biometricProtect;
+
+  bool get rememberPasswordDefault => _settings.rememberPassword;
 
   set biometricProtect(bool v) {
     _settings.biometricProtect = v;

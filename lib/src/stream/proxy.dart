@@ -67,6 +67,11 @@ class StreamProxy {
     await s?.close(force: true);
   }
 
+  /// Clears in-memory key cache (settings action).
+  void clearCaches() {
+    _keyCache.clear();
+  }
+
   /// Register the playable mirrors for a resource before opening it.
   void register(String resId, List<Uri> storages) {
     _streams[resId] = List.of(storages);

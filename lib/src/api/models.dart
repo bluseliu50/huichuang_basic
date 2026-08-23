@@ -139,12 +139,17 @@ class Lesson {
     required this.id,
     required this.title,
     required this.tags,
+    required this.chapterIds,
     this.isCoursePackage = false,
   });
 
   final String id;
   final String title;
   final Map<String, String> tags;
+
+  /// Ancestry in the chapter tree, root first; the last id is the leaf
+  /// chapter this lesson belongs to.
+  final List<String> chapterIds;
 
   /// `bklx` == 课程包 marks the packaged course (video + 课件 + …).
   final bool isCoursePackage;
@@ -155,6 +160,9 @@ class Lesson {
       id: j['id'] as String? ?? '',
       title: j['title'] as String? ?? '',
       tags: tags,
+      chapterIds: (j['chapter_ids'] as List? ?? const [])
+          .map((e) => e as String)
+          .toList(growable: false),
       isCoursePackage: tags['bklx'] == '课程包',
     );
   }

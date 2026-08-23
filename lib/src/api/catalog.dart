@@ -43,6 +43,80 @@ class CatalogService {
     }
   }
 
+  // ---------- 电子教材 (tch_material) ----------
+
+  TagTree? _tbTagTree;
+  List<TeachingMaterial>? _textbooks;
+  bool textbooksLoaded = false;
+
+  TagTree? get textbookTagTree => _tbTagTree;
+  List<TeachingMaterial>? get textbooks => _textbooks;
+
+  Future<void> loadTextbooks() async {
+    if (textbooksLoaded) return;
+    final versionJson = await _client.getFileJson(
+        'ndrs/resources/tch_material/version/data_version.json');
+    final version = (versionJson as Map)['module_version'] as int? ?? 0;
+    final cachedVersion =
+        int.tryParse(await _readCached('tb_version.txt') ?? '') ?? -2;
+
+    final tagCached = await _readCached('tb_tag_tree.json');
+    if (tagCached == null || version != cachedVersion) {
+      final raw =
+          await _client.getFileJson('ndrs/tags/tch_material_tag.json');
+      _tbTagTree = TagTree.fromJson(raw as Map<String, dynamic>);
+      await _writeCache('tb_tag_tree.json', jsonEncode(raw));
+    } else {
+      _tbTagTree =
+          TagTree.fromJson(jsonDecode(tagCached) as Map<String, dynamic>);
+    }
+
+    final booksCached = await _readCached('textbooks.json');
+    if (booksCached == null || version != cachedVersion) {
+      final books = <TeachingMaterial>[];
+      for (final part in const [100, 101, 102, 103]) {
+        final data = await _client
+            .getFileJson('ndrs/resources/tch_material/part_$part.json');
+        for (final m in (data as List).cast<Map>()) {
+          books.add(TeachingMaterial.fromJson(m.cast<String, dynamic>()));
+        }
+      }
+      _textbooks = books;
+      await _writeCache('textbooks.json', jsonEncode([
+        for (final b in books)
+          {
+            'id': b.id,
+            'title': b.title,
+            'tag_list': [
+              for (final e in b.tags.entries)
+                {
+                  'tag_dimension_id': e.key,
+                  'tag_name': e.value,
+                  'tag_id': b.tagIds[e.key],
+                },
+            ],
+          },
+      ]));
+    } else {
+      final list = jsonDecode(booksCached) as List;
+      _textbooks = list
+          .cast<Map>()
+          .map((m) => TeachingMaterial.fromJson(m.cast<String, dynamic>()))
+          .toList(growable: false);
+    }
+    if (version > 0) await _writeCache('tb_version.txt', '$version');
+    textbooksLoaded = true;
+  }
+
+  /// Case-insensitive textbook title search.
+  List<TeachingMaterial> searchTextbooks(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    return (_textbooks ?? const <TeachingMaterial>[])
+        .where((b) => b.title.toLowerCase().contains(q))
+        .toList(growable: false);
+  }
+
   /// Loads tag tree + materials, using the disk cache when the platform
   /// version is unchanged. Fresh data is fetched when versions differ or
   /// no cache exists; if the network fails, falls back to any cache.
