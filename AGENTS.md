@@ -14,8 +14,10 @@ commercial distribution.
 1. **NEVER commit secrets.** No tokens, `access_token` / `refresh_token` values,
    passwords, account numbers, API keys, `.env*`, `*.key`, `dev_secrets*.json`,
    `*token*.txt`. These paths are gitignored from the first commit — keep it that
-   way. Before every push run:
-   `git log -p | grep -iE '<phone>|access_token"[[:space:]]*[:=]|refresh_token"[[:space:]]*[:=]'`
+   way. Before every push, audit the full history for leaked credentials —
+   substitute the real test-account phone and password from your gitignored
+   `dev_secrets.json`, then run:
+   `git log -p | grep -iE '<phone>|<password>|access_token"[[:space:]]*[:=]|refresh_token"[[:space:]]*[:=]'`
    and confirm no *values* (test fixtures with dummy data are fine; real
    credentials are not). Test accounts go in a gitignored `dev_secrets.json`
    under the repo root or `/tmp`, never in the repo.

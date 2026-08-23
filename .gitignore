@@ -8,6 +8,7 @@ HANDOFF*.md
 **/*.key
 *.pem
 *.keystore
+*.jks
 dev_secrets*.json
 config/dev/
 credentials*.json
