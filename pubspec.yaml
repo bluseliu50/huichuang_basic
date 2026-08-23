@@ -1,0 +1,51 @@
+name: huichuang_basic
+description: "惠窗中小学端 — unofficial Flutter client for basic.smartedu.cn (个人学习用途，非商业)."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  cupertino_icons: ^1.0.8
+
+  # Video player (same stack as PiliPlus; mpv backend plays AES-128 HLS natively)
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_video: ^1.0.5
+
+  # Networking & crypto
+  dio: ^5.9.1
+  crypto: ^3.0.3
+  pointycastle: ^3.9.1
+
+  # State & storage
+  provider: ^6.1.2
+  shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.2
+
+  # Platform integration
+  local_auth: ^3.0.2
+  flutter_inappwebview: ^6.1.5
+  desktop_webview_window: ^0.3.0
+  window_manager: ^0.4.3
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.1
+
+  # UI
+  cached_network_image: ^3.4.1
+  pdfrx: ^1.0.110
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

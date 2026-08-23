@@ -1,0 +1,23 @@
+* text=auto eol=lf
+*.dart linguist-language=Dart
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.db binary
+*.dylib binary
+*.so binary
+*.dll binary
+*.a binary
+*.lib binary
+*.exe binary
+*.jar binary
+*.zip binary
+*.gz binary

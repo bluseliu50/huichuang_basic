@@ -1,0 +1,57 @@
+# ---- Secrets & credentials — NEVER COMMIT (policy in AGENTS.md) ----
+.env*
+**/*.env
+**/*.key
+*.pem
+*.keystore
+dev_secrets*.json
+config/dev/
+credentials*.json
+*token*.txt
+account*.txt
+
+# ---- Flutter / Dart ----
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+app.*.symbols
+app.*.map.json
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ---- IDE / tooling ----
+.idea/
+*.iml
+.vscode/
+.claude/
+*.log
+.DS_Store
+
+# ---- Platform build artifacts ----
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+macos/Flutter/ephemeral
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/Flutter-Debug.xcconfig
+macos/Flutter/Flutter-Release.xcconfig
+macos/Flutter/Flutter-Profile.xcconfig
+linux/flutter/ephemeral
+windows/flutter/ephemeral
+android/.gradle/
+android/local.properties
+android/key.properties
+**/xcuserdata/
+**/DerivedData/
