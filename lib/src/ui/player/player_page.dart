@@ -17,10 +17,19 @@ import '../login/login_card.dart';
 import '../pdf/pdf_reader_page.dart';
 
 class PlayerPage extends StatefulWidget {
-  const PlayerPage({super.key, required this.resId, required this.title});
+  const PlayerPage({
+    super.key,
+    required this.resId,
+    required this.title,
+    this.tmId,
+  });
 
   final String resId;
   final String title;
+
+  /// Teaching material the lesson belongs to; falls back to the currently
+  /// open material so watch history can deep-link back to its course.
+  final String? tmId;
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -144,9 +153,10 @@ class _PlayerPageState extends State<PlayerPage> {
     await _appController?.recordWatch(
           resId: widget.resId,
           title: _detail?.title ?? widget.title,
-          tmId: '',
+          tmId: widget.tmId ?? _appController?.material?.id ?? '',
           positionSec: pos.inMilliseconds / 1000,
           durationSec: dur.inMilliseconds / 1000,
+          coverUrl: _appController?.coverUrlOf(widget.resId)?.toString(),
         );
   }
 

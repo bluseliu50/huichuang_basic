@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -197,7 +198,10 @@ class _ContinueCard extends StatelessWidget {
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) =>
-                  PlayerPage(resId: entry.resId, title: entry.title),
+                  PlayerPage(
+                      resId: entry.resId,
+                      title: entry.title,
+                      tmId: entry.tmId.isEmpty ? null : entry.tmId),
             ),
           ),
           child: Padding(
@@ -205,6 +209,21 @@ class _ContinueCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (entry.coverUrl != null)
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: CachedNetworkImage(
+                        imageUrl: entry.coverUrl!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorWidget: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  )
+                else
+                  const Spacer(),
+                const SizedBox(height: 10),
                 Row(children: [
                   Icon(Icons.play_circle_outline,
                       size: 20, color: Theme.of(context).colorScheme.primary),
@@ -218,7 +237,6 @@ class _ContinueCard extends StatelessWidget {
                     ),
                   ),
                 ]),
-                const Spacer(),
                 Text(
                   '${_fmt(entry.positionSec)} / ${_fmt(entry.durationSec)}',
                   style: Theme.of(context).textTheme.bodySmall,
