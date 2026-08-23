@@ -31,7 +31,6 @@ class _LoginCardState extends State<LoginCard> {
   bool _busy = false;
   bool _biometricsAvailable = false;
   String? _hint;
-  String? _notice;
 
   @override
   void initState() {
@@ -46,22 +45,20 @@ class _LoginCardState extends State<LoginCard> {
   Future<void> _prefill() async {
     final auth = context.read<AuthController>();
     final account = auth.savedAccount;
-    if (account != null) _account.text = account;
+    if (account == null) return; // first login: nothing saved yet
+    _account.text = account;
     // Vault access: biometrics gate ONLY here, never at startup.
-    if (account != null) {
-      final pw = await auth.unlockPassword();
-      if (pw != null && mounted) _password.text = pw;
+    final pw = await auth.unlockPassword();
+    if (!mounted || pw == null) return; // cancelled → manual entry below
+    _password.text = pw;
+    // Unlocked through biometrics → go straight to the captcha window.
+    // (With protection off there is no proof to reuse; user taps 登录.)
+    if (auth.biometricProtect) {
+      await _start(alreadyVerified: true);
     }
   }
 
-  @override
-  void dispose() {
-    _account.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  Future<void> _start() async {
+  Future<void> _start({bool alreadyVerified = false}) async {
     final account = _account.text.trim();
     final password = _password.text;
     if (account.isEmpty || password.isEmpty) {
@@ -71,20 +68,25 @@ class _LoginCardState extends State<LoginCard> {
     setState(() {
       _busy = true;
       _hint = null;
-      _notice = null;
     });
     final auth = context.read<AuthController>();
-    // Saving credentials is gated by biometrics when protection is on:
-    // verify NOW (the user is present) so the first login's vault write
-    // also proves presence. A declined prompt logs in without saving.
-    var remember = auth.rememberPasswordDefault;
-    if (remember) {
-      remember = await auth.authenticateForVaultSave();
+    // Marriott-style gate: with protection on, the 登录 tap verifies
+    // biometrics first; a cancelled prompt aborts. Manual entries still
+    // overwrite the saved credentials on success. The auto-login path
+    // arrives alreadyVerified (its fingerprint proof just succeeded).
+    if (!alreadyVerified && auth.biometricProtect) {
+      final ok = await auth.authenticateForLogin();
       if (!mounted) return;
-      if (!remember) {
-        setState(() => _notice = '未通过生物验证，本次登录不会保存密码');
+      if (!ok) {
+        setState(() {
+          _busy = false;
+          _hint = '指纹验证未通过，可手动输入账号密码后重试';
+        });
+        return;
       }
     }
+    // Credentials confirmed here always overwrite the vault entry.
+    final remember = auth.rememberPasswordDefault;
     try {
       if (!kIsWeb &&
           (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
@@ -189,14 +191,6 @@ class _LoginCardState extends State<LoginCard> {
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.error)),
             ],
-            if (_notice != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _notice!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline),
-              ),
-            ],
             if (_biometricsAvailable) ...[
               const SizedBox(height: 8),
               SwitchListTile(
@@ -207,7 +201,7 @@ class _LoginCardState extends State<LoginCard> {
                 onChanged: (v) => auth.biometricProtect = v,
               ),
               Text(
-                '开启后，读取或保存登录密码需先验证指纹／面容；启动应用时不会询问。关闭后本次登录直接保存密码。',
+                '开启后，登录及读取、保存密码需先验证指纹／面容；启动应用时不会询问。取消验证可手动输入账号密码。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.outline),
               ),
@@ -266,6 +260,13 @@ class _MobileLoginSheetState extends State<MobileLoginSheet> {
         if (token != null) {
           _gotToken = true;
           _poll?.cancel();
+          // Reset the profile right after capture so this session never
+          // survives into the next login attempt (cross-account reuse).
+          await CookieManager.instance().deleteAllCookies();
+          try {
+            await _controller?.evaluateJavascript(
+                source: svc.tokenClearExpression());
+          } catch (_) {}
           if (mounted) Navigator.of(context).pop(token);
         }
       } catch (_) {}
@@ -322,13 +323,20 @@ class _MobileLoginSheetState extends State<MobileLoginSheet> {
                 userAgent:
                     'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125 Mobile Safari/537.36',
               ),
-              onWebViewCreated: (c) {
+              onWebViewCreated: (c) async {
                 _controller = c;
-                _startPolling();
+                // Fresh cookie jar per attempt: a previous account's
+                // session must never auto-login the next attempt.
+                await CookieManager.instance().deleteAllCookies();
               },
               onLoadStop: (c, url) async {
                 if (!_pageEverLoaded) {
                   setState(() => _pageEverLoaded = true);
+                  // Drop any token left in localStorage BEFORE polling
+                  // starts, so only THIS attempt's fresh token is captured.
+                  await c.evaluateJavascript(
+                      source: svc.tokenClearExpression());
+                  _startPolling();
                 }
                 await c.evaluateJavascript(
                     source: svc.credentialInjection(widget.account, widget.password));

@@ -73,6 +73,11 @@ String credentialInjection(String account, String password) {
 String tokenPollExpression() =>
     'localStorage.getItem("$_tokenKey")';
 
+/// Removes the captured token from the webview's localStorage so a later
+/// login attempt can never re-capture a previous session's token.
+String tokenClearExpression() =>
+    'localStorage.removeItem("$_tokenKey")';
+
 String _jsEscape(String s) =>
     s.replaceAll('\\', r'\\').replaceAll("'", r"\'").replaceAll('\n', '');
 
@@ -105,6 +110,9 @@ class DesktopLoginService implements LoginService {
     if (!await WebviewWindow.isWebviewAvailable()) {
       return const LoginResult(cancelled: true);
     }
+    // Fresh webview profile per attempt: a previous account's cookies must
+    // never auto-login the next attempt (credential cross-talk).
+    await WebviewWindow.clearAll();
     final completer = Completer<LoginResult>();
     final webview = await WebviewWindow.create(
       configuration: const CreateConfiguration(
@@ -151,7 +159,11 @@ class DesktopLoginService implements LoginService {
               ? raw.substring(1, raw.length - 1)
               : raw;
           try {
-            done(LoginResult(token: TokenBundle.fromLocalStorage(value)));
+            final token = TokenBundle.fromLocalStorage(value);
+            // Reset the profile right after capturing the token so the
+            // session never survives into the next login attempt.
+            unawaited(WebviewWindow.clearAll());
+            done(LoginResult(token: token));
           } catch (_) {}
         }
       } catch (_) {

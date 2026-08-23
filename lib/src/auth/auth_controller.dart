@@ -238,13 +238,13 @@ class AuthController extends ChangeNotifier {
     return pw;
   }
 
-  /// Biometric gate for *saving* fresh credentials at login time.
-  /// Reads are gated by [unlockPassword]; this gates the write so the
-  /// first login also proves presence before the password lands in the
-  /// vault. Returns whether saving may proceed.
-  Future<bool> authenticateForVaultSave() async {
+  /// Biometric gate for the login action itself (Marriott-style): when
+  /// protection is on, tapping 登录 verifies presence first; the same
+  /// proof covers saving the credentials afterwards. Reads stay gated by
+  /// [unlockPassword]. Returns whether the login may proceed.
+  Future<bool> authenticateForLogin() async {
     if (!_settings.biometricProtect) return true;
-    return _biometrics.authenticate('验证指纹以保存登录密码');
+    return _biometrics.authenticate('验证指纹以登录并保存密码');
   }
 
   Future<bool> biometricsAvailable() => _biometrics.isAvailable();
