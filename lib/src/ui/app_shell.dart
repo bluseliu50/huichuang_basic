@@ -57,7 +57,7 @@ class _AppShellState extends State<AppShell> {
     final extended = width >= 1280;
 
     final pages = [
-      const HomePage(),
+      HomePage(onOpenCourses: () => setState(() => _index = 1)),
       const CoursesPage(),
       const TextbooksPage(),
       const SearchPage(),

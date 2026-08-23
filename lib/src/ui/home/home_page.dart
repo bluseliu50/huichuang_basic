@@ -8,7 +8,10 @@ import '../courses/courses_page.dart';
 import '../player/player_page.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.onOpenCourses});
+
+  /// Switches the shell to the 课程教学 tab after a subject shortcut jump.
+  final VoidCallback? onOpenCourses;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +53,7 @@ class HomePage extends StatelessWidget {
                 if (history.isNotEmpty) ...[
                   const _Header('继续观看'),
                   SizedBox(
-                    height: 124,
+                    height: 216,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: history.length,
@@ -62,7 +65,8 @@ class HomePage extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
                 const _Header('快速开始'),
-                _QuickStart(tree: app.catalog.tagTree),
+                _QuickStart(
+                    tree: app.catalog.tagTree, onOpenCourses: onOpenCourses),
                 const SizedBox(height: 28),
                 Text(
                   '惠窗中小学端是非官方第三方客户端，仅供个人学习使用。\n平台内容版权归国家中小学智慧教育平台及资源提供方所有。',
@@ -97,9 +101,10 @@ class _Header extends StatelessWidget {
 /// 学段 chips → tapping opens the textbook picker; 学科 shortcuts for the
 /// first stage.
 class _QuickStart extends StatelessWidget {
-  const _QuickStart({required this.tree});
+  const _QuickStart({required this.tree, this.onOpenCourses});
 
   final TagTree? tree;
+  final VoidCallback? onOpenCourses;
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +135,7 @@ class _QuickStart extends StatelessWidget {
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: Theme.of(context).colorScheme.outline)),
         const SizedBox(height: 8),
-        _CommonSubjects(stages: stages),
+        _CommonSubjects(stages: stages, onOpenCourses: onOpenCourses),
       ],
     );
   }
@@ -144,31 +149,42 @@ class _QuickStart extends StatelessWidget {
 }
 
 class _CommonSubjects extends StatelessWidget {
-  const _CommonSubjects({required this.stages});
+  const _CommonSubjects({required this.stages, this.onOpenCourses});
 
   final List<TagNode> stages;
+  final VoidCallback? onOpenCourses;
 
   static const _common = ['语文', '数学', '英语', '道德与法治', '科学', '体育与健康'];
 
   @override
   Widget build(BuildContext context) {
-    final grades = stages.first.children;
-    final subjects = <TagNode>[
-      for (final g in grades)
+    // Subject shortcuts of the first stage; each remembers its parent grade
+    // so a first-time jump still resolves to a valid (stage, grade, subject).
+    final stage = stages.first;
+    final subjects = <(String, String, TagNode)>[
+      for (final g in stage.children)
         for (final s in g.children)
-          if (_common.contains(s.name)) s,
+          if (_common.contains(s.name)) (stage.id, g.id, s),
     ];
     final seen = <String>{};
-    final unique =
-        subjects.where((s) => seen.add(s.name)).toList();
+    final unique = subjects.where((t) => seen.add(t.$3.name)).toList();
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        for (final s in unique.take(12))
+        for (final (stageId, gradeId, s) in unique.take(12))
           OutlinedButton(
-            onPressed: () => showTextbookPicker(context),
+            onPressed: () {
+              final app = context.read<AppController>();
+              final opened = app.selectSubject(
+                stageId: stageId,
+                subjectId: s.id,
+                fallbackGradeId: gradeId,
+              );
+              onOpenCourses?.call();
+              if (!opened) showTextbookPicker(context);
+            },
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               minimumSize: const Size(0, 40),
@@ -209,20 +225,33 @@ class _ContinueCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (entry.coverUrl != null)
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: CachedNetworkImage(
-                        imageUrl: entry.coverUrl!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorWidget: (_, _, _) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  )
-                else
-                  const Spacer(),
+                // Full 16:9 cover — never crop into a wide sliver.
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: entry.coverUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: entry.coverUrl!,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, _, _) => Container(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                            ),
+                          )
+                        : Container(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer,
+                            child: Icon(Icons.play_circle_outline,
+                                size: 34,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer),
+                          ),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Row(children: [
                   Icon(Icons.play_circle_outline,
