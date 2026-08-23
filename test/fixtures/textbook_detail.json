@@ -1,0 +1,44 @@
+{
+  "id": "bdc00134-465d-454b-a541-dcd0cec4d86e",
+  "title": "（根据2022年版课程标准修订）义务教育教科书·道德与法治一年级上册",
+  "global_title": {
+    "zh-CN": "（根据2022年版课程标准修订）义务教育教科书·道德与法治一年级上册"
+  },
+  "ti_items": [
+    {
+      "ti_format": "txt",
+      "ti_storages": [
+        "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.pkg/ebook_mapping_1750733054539.txt",
+        "https://r2-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.pkg/ebook_mapping_1750733054539.txt"
+      ]
+    },
+    {
+      "ti_format": "folder",
+      "ti_storages": [
+        "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.t/zh-CN/1756191806467/transcode/image",
+        "https://r2-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.t/zh-CN/1756191806467/transcode/image"
+      ]
+    },
+    {
+      "ti_format": "pdf",
+      "ti_storages": [
+        "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.pkg/义务教育教科书 道德与法治 一年级 上册_1756191804648.pdf",
+        "https://r2-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.pkg/义务教育教科书 道德与法治 一年级 上册_1756191804648.pdf"
+      ]
+    },
+    {
+      "ti_format": "folder",
+      "ti_storages": [
+        "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.t/zh-CN/1756191806467/transcode/image",
+        "https://r2-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.t/zh-CN/1756191806467/transcode/image"
+      ]
+    },
+    {
+      "ti_format": "jpg",
+      "ti_storages": [
+        "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.t/zh-CN/1756191806467/transcode/image/1.jpg",
+        "https://r2-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/bdc00134-465d-454b-a541-dcd0cec4d86e.t/zh-CN/1756191806467/transcode/image/1.jpg"
+      ]
+    }
+  ]
+}

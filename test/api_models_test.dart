@@ -79,6 +79,19 @@ void main() {
       final d = ResourceDetail.fromJson(fixture('resource_detail.json'));
       expect(d.durationSeconds, 3600);
     });
+
+    test('parses tch_material root ti_items into per-format resources', () {
+      final d = ResourceDetail.fromJson(fixture('textbook_detail.json'));
+      final pdf = d.related.where((r) => r.format == 'pdf').toList();
+      expect(pdf, hasLength(1));
+      for (final u in pdf.first.storages) {
+        expect(u.host, contains('-ndr-private.ykt.cbern.com.cn'));
+        expect(u.path, endsWith('.pdf'));
+      }
+      // Mixed sibling formats stay grouped but distinguishable.
+      expect(d.related.map((r) => r.format), containsAll(['txt', 'folder']));
+      expect(pdf.first.coverUrl, isNotNull); // jpg cover captured
+    });
   });
 
   group('TokenBundle', () {

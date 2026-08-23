@@ -224,6 +224,37 @@ class RelatedResource {
       coverUrl: cover,
     );
   }
+
+  /// tch_material (电子教材) details carry `ti_items` at the root instead of
+  /// a relations map; formats are mixed (txt / folder / pdf / jpg), so group
+  /// storages by format into one resource each.
+  static List<RelatedResource> fromRootItems(Map<String, dynamic> j) {
+    final byFormat = <String, List<Uri>>{};
+    Uri? cover;
+    for (final item in (j['ti_items'] as List? ?? const []).cast<Map>()) {
+      final f = item['ti_format'] as String? ?? '';
+      for (final s in (item['ti_storages'] as List? ?? const [])) {
+        final u = s as String?;
+        if (u == null || u.isEmpty) continue;
+        final uri = Uri.parse(u);
+        if (f == 'jpg') {
+          cover ??= uri;
+        } else {
+          byFormat.putIfAbsent(f, () => []).add(uri);
+        }
+      }
+    }
+    return [
+      for (final e in byFormat.entries)
+        RelatedResource(
+          id: j['id'] as String? ?? '',
+          title: j['title'] as String? ?? '',
+          format: e.key,
+          storages: e.value,
+          coverUrl: cover,
+        ),
+    ];
+  }
 }
 
 class ResourceDetail {
@@ -261,13 +292,17 @@ class ResourceDetail {
     return null;
   }
   factory ResourceDetail.fromJson(Map<String, dynamic> j) {
-    final related = ((j['relations'] as Map?)?['national_course_resource']
+    var related = ((j['relations'] as Map?)?['national_course_resource']
                 as List? ??
             const [])
         .cast<Map>()
         .map((m) => RelatedResource.fromJson(m.cast<String, dynamic>()))
         .where((r) => r.storages.isNotEmpty || r.isVideo)
         .toList(growable: false);
+    if (related.isEmpty) {
+      // 电子教材 details have no relations map; ti_items live at the root.
+      related = RelatedResource.fromRootItems(j);
+    }
 
     String? provider;
     final providers = (j['provider_list'] as List?)?.cast<Map>();
