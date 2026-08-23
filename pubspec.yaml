@@ -32,6 +32,8 @@ dependencies:
 
   # Platform integration
   local_auth: ^3.0.2
+  local_auth_android: ^2.0.8
+  local_auth_darwin: ^2.0.3
   flutter_inappwebview: ^6.1.5
   desktop_webview_window: ^0.3.0
   window_manager: ^0.4.3
