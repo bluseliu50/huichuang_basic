@@ -31,7 +31,9 @@ app.*.map.json
 .idea/
 *.iml
 .vscode/
-.claude/
+# Claude Code project dir: ignore local settings, keep the committed skill link
+.claude/*
+!.claude/skills/
 *.log
 .DS_Store
 

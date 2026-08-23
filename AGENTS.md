@@ -20,9 +20,11 @@ commercial distribution.
    credentials are not). Test accounts go in a gitignored `dev_secrets.json`
    under the repo root or `/tmp`, never in the repo.
 2. **Do not regress the pinned fixes** (see "Load-bearing decisions" below).
-3. Platform API facts live in `.agents/skills/smartedu-streaming/SKILL.md`.
-   If the platform changes, re-verify with curl/browser first, fix code, then
-   update that skill — it is the durable knowledge base.
+3. Platform API facts live in `.agents/skills/smartedu-streaming/SKILL.md`
+   (exposed to Claude Code via the committed `.claude/skills/smartedu-streaming`
+   relative symlink — do not delete that link). If the platform changes,
+   re-verify with curl/browser first, fix code, then update that skill — it is
+   the durable knowledge base.
 4. Biometric auth gates **only** the credential vault (saved-password unlock),
    never app launch. Tests assert this; keep them green.
 5. New dependencies require a strong justification written in the commit body.
