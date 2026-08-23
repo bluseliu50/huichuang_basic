@@ -158,4 +158,21 @@ void main() {
     expect(await store.loadPassword(), isNull);
     expect(await store.loadToken(), isNull);
   });
+
+  test('authenticateForVaultSave gates saving when protection is on',
+      () async {
+    final c = controller();
+
+    settings.biometricProtect = false;
+    expect(await c.authenticateForVaultSave(), isTrue);
+    expect(gate.calls, 0, reason: 'no prompt when toggle off');
+
+    settings.biometricProtect = true;
+    gate.shouldPass = false;
+    expect(await c.authenticateForVaultSave(), isFalse);
+    expect(gate.calls, 1);
+
+    gate.shouldPass = true;
+    expect(await c.authenticateForVaultSave(), isTrue);
+  });
 }
