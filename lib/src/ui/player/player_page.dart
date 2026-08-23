@@ -179,8 +179,14 @@ class _PlayerPageState extends State<PlayerPage> {
               )
             : Column(
                 children: [
-                  _buildVideo(context),
-                  Expanded(child: _buildBelow(context)),
+                  Expanded(
+                    flex: 5,
+                    child: _buildVideo(context),
+                  ),
+                  Expanded(
+                    flex: 4,
+                    child: _buildBelow(context),
+                  ),
                 ],
               );
 
@@ -196,13 +202,15 @@ class _PlayerPageState extends State<PlayerPage> {
   Widget _buildVideo(BuildContext context) {
     final c = _controller;
     if (c == null) return const SizedBox.shrink();
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Video(
-        controller: c,
-        controls: (state) => _HuichuangControls(
-          state: state,
-          isDesktop: _isDesktop,
+    return Center(
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Video(
+          controller: c,
+          controls: (state) => _HuichuangControls(
+            state: state,
+            isDesktop: _isDesktop,
+          ),
         ),
       ),
     );

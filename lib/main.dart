@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'src/api/catalog.dart';
+import 'src/api/models.dart';
 import 'src/api/client.dart';
 import 'src/auth/auth_controller.dart';
 import 'src/auth/biometric.dart';
@@ -21,12 +23,22 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  final proxy = StreamProxy();
-  await proxy.start();
-
   final settings = await AppSettings.load();
+  final store = TokenStore(FlutterSecureKV());
+  // E2E/dev hook: seed the token bundle from env (never committed).
+  final tokenJson = Platform.environment['HC_E2E_TOKEN'];
+  if (tokenJson != null && tokenJson.isNotEmpty) {
+    try {
+      final t = TokenBundle.fromUcJson(
+          jsonDecode(tokenJson) as Map<String, dynamic>);
+      await store.saveToken(t);
+      debugPrint('E2E token seeded, expires ${DateTime.fromMillisecondsSinceEpoch(t.expiresAt)}');
+    } catch (e) {
+      debugPrint('HC_E2E_TOKEN parse failed: $e');
+    }
+  }
   final auth = AuthController(
-    store: TokenStore(FlutterSecureKV()),
+    store: store,
     settings: settings,
     biometrics: SystemBiometricGate(),
     loginPerformer: (account, password) async {
@@ -39,6 +51,18 @@ Future<void> main() async {
       return null;
     },
   );
+  final proxy = StreamProxy(
+    tokenProvider: () => auth.token?.accessToken,
+    onLoginCallback: (raw) async {
+      try {
+        final t = TokenBundle.fromLocalStorage(raw);
+        await auth.acceptExternalToken(t);
+      } catch (_) {}
+    },
+  );
+  await proxy.start();
+  debugPrint('STREAM_PROXY started on 127.0.0.1:${proxy.port}');
+
   auth.init(); // silent; never blocks startup
 
   if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
@@ -66,6 +90,8 @@ Future<void> main() async {
 
   // E2E hook: HC_E2E_RESID=<resId> auto-opens that lesson's player.
   final e2eResId = Platform.environment['HC_E2E_RESID'];
+
+  app.proxy = proxy;
 
   runApp(HuichuangApp(
     proxy: proxy,

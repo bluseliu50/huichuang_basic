@@ -12,16 +12,16 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import 'key_vault.dart';
 
 class StreamProxy {
   StreamProxy({
-    String Function()? tokenProvider,
+    String? Function()? tokenProvider,
     Future<void> Function(String rawTokenJson)? onLoginCallback,
     bool allowLoopbackUpstream = false,
   })  : _tokenProvider = tokenProvider,
@@ -34,7 +34,7 @@ class StreamProxy {
   static const _privateNodePattern = '-ndr-private.ykt.cbern.com.cn';
   static final _nodePrefix = RegExp(r'^https://r[123]-ndr-private');
 
-  final String Function()? _tokenProvider;
+  final String? Function()? _tokenProvider;
   final Future<void> Function(String rawTokenJson)? _onLoginCallback;
 
   HttpServer? _server;
@@ -383,6 +383,7 @@ class StreamProxy {
   }
 
   void _fail(HttpRequest req, int status, String message) {
+    debugPrint('PROXY_FAIL $status ${req.uri.path} $message');
     try {
       final clean = message.replaceAll(RegExp(r'[\r\n]+'), ' ');
       req.response.statusCode = status;

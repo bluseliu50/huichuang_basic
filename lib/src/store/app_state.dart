@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/catalog.dart';
 import '../api/client.dart';
 import '../api/models.dart';
+import '../stream/proxy.dart';
 
 class Selection {
   const Selection({
@@ -109,6 +110,9 @@ class AppController extends ChangeNotifier {
 
   final CatalogService catalog;
   final SmarteduClient client;
+
+  /// Set by main once the auth-injecting proxy is running.
+  StreamProxy? proxy;
   SharedPreferences? _settings;
 
   LoadPhase catalogPhase = LoadPhase.idle;
@@ -220,6 +224,36 @@ class AppController extends ChangeNotifier {
       await openMaterial(m);
     }
   }
+
+  final Map<String, Uri?> _coverCache = {};
+
+  /// Cover image for a lesson, resolved from the resource detail's
+  /// embedded jpg; proxied when on the private CDN.
+  Uri? coverUrlOf(String resId) {
+    final cached = _coverCache[resId];
+    if (cached != null) {
+      return _maybeProxy(cached);
+    }
+    if (_coverCache.containsKey(resId)) return null; // in flight
+    _coverCache[resId] = null;
+    client.getResourceDetail(resId).then((d) {
+      final video = d.video;
+      final cover = video?.coverUrl;
+      if (cover != null) {
+        _coverCache[resId] = cover;
+        notifyListeners();
+      } else {
+        _coverCache.remove(resId);
+      }
+    }).catchError((_) {
+      _coverCache.remove(resId);
+    });
+    return null;
+  }
+
+  Uri _maybeProxy(Uri u) => proxy != null && u.host.contains('-ndr-private')
+      ? proxy!.fileUrl(u)
+      : u;
 
   List<Lesson> lessonsFor(ChapterNode chapter) {
     final direct = _lessonsByChapter[chapter.id] ?? const <Lesson>[];

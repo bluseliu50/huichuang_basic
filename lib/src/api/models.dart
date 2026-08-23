@@ -179,6 +179,7 @@ class RelatedResource {
     required this.format,
     required this.storages,
     this.typeName,
+    this.coverUrl,
   });
 
   final String id;
@@ -186,6 +187,7 @@ class RelatedResource {
   final String? format; // m3u8 | pdf | ppt | doc | …
   final List<Uri> storages; // r1/r2/r3 mirrors, in preference order
   final String? typeName; // 微课视频 / 课件 / 教学设计 / …
+  final Uri? coverUrl; // jpg cover embedded in the same pack (video entries)
 
   bool get isVideo => format == 'm3u8';
 
@@ -197,8 +199,17 @@ class RelatedResource {
         .map((t) => t['ti_format'] as String?)
         .firstWhere((f) => f != null && f.isNotEmpty, orElse: () => null);
     final storages = <Uri>[];
+    Uri? cover;
     for (final item in items) {
-      if ((item['ti_format'] as String?) != format) continue;
+      final f = item['ti_format'] as String?;
+      if (f != format) {
+        if (f == 'jpg' && cover == null) {
+          final first =
+              (item['ti_storages'] as List? ?? const []).firstOrNull as String?;
+          if (first != null && first.isNotEmpty) cover = Uri.parse(first);
+        }
+        continue;
+      }
       for (final s in (item['ti_storages'] as List? ?? const [])) {
         final u = s as String?;
         if (u != null && u.isNotEmpty) storages.add(Uri.parse(u));
@@ -210,6 +221,7 @@ class RelatedResource {
       format: format,
       storages: storages,
       typeName: j['resource_type_code_name'] as String?,
+      coverUrl: cover,
     );
   }
 }

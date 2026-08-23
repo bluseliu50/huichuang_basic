@@ -65,7 +65,20 @@ class _TextbooksPageState extends State<TextbooksPage> {
       );
     }
 
-    final stages = tree.roots;
+    // The tch_material tree nests real levels under a container root
+    // (电子教材) — descend to the first zxxxd level.
+    var stages = tree.roots;
+    while (stages.isNotEmpty &&
+        stages.first.dimensionId != 'zxxxd' &&
+        stages.first.children.isNotEmpty) {
+      stages = stages.first.children;
+    }
+    if (stages.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('教材')),
+        body: const Center(child: Text('教材目录为空')),
+      );
+    }
     _stageId ??= stages.first.id;
     final subjects = _childrenOf(stages, _stageId);
     _subjectId = subjects.any((s) => s.id == _subjectId)

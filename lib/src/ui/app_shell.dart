@@ -5,7 +5,6 @@ import '../store/app_state.dart';
 import 'courses/courses_page.dart';
 import 'player/player_page.dart';
 import 'home/home_page.dart';
-import 'login/login_card.dart';
 import 'pdf/textbooks_page.dart';
 import 'search/search_page.dart';
 import 'settings/settings_page.dart';
@@ -103,34 +102,6 @@ class _AppShellState extends State<AppShell> {
           const VerticalDivider(width: 1, thickness: 1),
           Expanded(child: body),
         ],
-      ),
-    );
-  }
-}
-
-/// Banner shown when the token expired and manual re-login is needed.
-class ReloginBanner extends StatelessWidget {
-  const ReloginBanner({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: SafeArea(
-        bottom: false,
-        child: ListTile(
-          dense: true,
-          leading: Icon(Icons.warning_amber_rounded,
-              color: Theme.of(context).colorScheme.onErrorContainer),
-          title: Text(
-            '登录已过期，播放和下载需要重新登录',
-            style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-          ),
-          trailing: FilledButton.tonal(
-            onPressed: () => showLoginCard(context),
-            child: const Text('重新登录'),
-          ),
-        ),
       ),
     );
   }

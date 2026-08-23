@@ -18,7 +18,12 @@ class CoursesPage extends StatelessWidget {
           TextButton.icon(
             onPressed: () => showTextbookPicker(context),
             icon: const Icon(Icons.tune, size: 18),
-            label: Text(app.material?.title ?? '选择教材'),
+            label: Text(
+              app.material?.title ?? '选择教材',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13),
+            ),
           ),
           const SizedBox(width: 8),
         ],
@@ -66,10 +71,15 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-/// Desktop: chapter tree + lesson list side by side.
-/// Mobile: single scrolling list of expandable chapters.
-class _BrowserBody extends StatelessWidget {
+class _BrowserBody extends StatefulWidget {
   const _BrowserBody();
+
+  @override
+  State<_BrowserBody> createState() => _BrowserBodyState();
+}
+
+class _BrowserBodyState extends State<_BrowserBody> {
+  String? _selectedChapterId;
 
   @override
   Widget build(BuildContext context) {
@@ -95,42 +105,57 @@ class _BrowserBody extends StatelessWidget {
         ),
       );
     }
+
+    final selected = _findChapter(app.chapters, _selectedChapterId) ??
+        app.chapters.first;
+    final selectedLessons = app.lessonsFor(selected);
     final wide = MediaQuery.sizeOf(context).width >= 1000;
-    if (wide) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 340,
-            child: _ChapterTree(app: app),
-          ),
-          const VerticalDivider(width: 1),
-          const Expanded(child: _LessonPane()),
-        ],
+
+    if (!wide) {
+      // Mobile: chapters as expandable tiles with inline lessons.
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        itemCount: app.chapters.length,
+        itemBuilder: (context, i) => _ChapterTile(
+          node: app.chapters[i],
+          app: app,
+          selectedId: selected.id,
+          onSelect: (id) => setState(() => _selectedChapterId = id),
+        ),
       );
     }
-    return _ChapterTree(app: app, expandedAll: false);
-  }
-}
 
-class _ChapterTree extends StatelessWidget {
-  const _ChapterTree({required this.app, this.expandedAll = true});
-
-  final AppController app;
-  final bool expandedAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-      itemCount: app.chapters.length,
-      itemBuilder: (context, i) => _ChapterTile(
-        node: app.chapters[i],
-        app: app,
-        initiallyExpanded: expandedAll,
-        depth: 0,
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: 300,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+            itemCount: app.chapters.length,
+            itemBuilder: (context, i) => _ChapterTile(
+              node: app.chapters[i],
+              app: app,
+              selectedId: selected.id,
+              onSelect: (id) => setState(() => _selectedChapterId = id),
+              dense: true,
+            ),
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        Expanded(child: _LessonPane(chapter: selected, lessons: selectedLessons)),
+      ],
     );
+  }
+
+  ChapterNode? _findChapter(List<ChapterNode> nodes, String? id) {
+    if (id == null) return null;
+    for (final n in nodes) {
+      if (n.id == id) return n;
+      final hit = _findChapter(n.children ?? const [], id);
+      if (hit != null) return hit;
+    }
+    return null;
   }
 }
 
@@ -138,97 +163,95 @@ class _ChapterTile extends StatelessWidget {
   const _ChapterTile({
     required this.node,
     required this.app,
-    required this.initiallyExpanded,
-    required this.depth,
+    required this.selectedId,
+    required this.onSelect,
+    this.dense = false,
+    this.depth = 0,
   });
 
   final ChapterNode node;
   final AppController app;
-  final bool initiallyExpanded;
+  final String selectedId;
+  final void Function(String id) onSelect;
+  final bool dense;
   final int depth;
 
   @override
   Widget build(BuildContext context) {
     final lessons = app.lessonsFor(node);
     final hasChildren = node.children?.isNotEmpty == true;
+    final selected = selectedId == node.id;
+
     if (!hasChildren) {
       return Padding(
-        padding: EdgeInsets.only(left: 14.0 * depth),
+        padding: EdgeInsets.only(left: 12.0 * depth),
         child: ListTile(
           dense: true,
-          title: Text(node.title,
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: lessons.isEmpty
-              ? null
-              : Badge(label: Text('${lessons.length}')),
-          onTap: lessons.isEmpty
-              ? null
-              : () => _openLessons(context, node.title, lessons),
+          selected: selected,
+          title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: lessons.isEmpty ? null : Text('${lessons.length}'),
+          onTap: () => onSelect(node.id),
         ),
       );
     }
     return Padding(
-      padding: EdgeInsets.only(left: 10.0 * depth),
+      padding: EdgeInsets.only(left: 8.0 * depth),
       child: ExpansionTile(
-        initiallyExpanded: initiallyExpanded && depth == 0,
-        dense: true,
+        initiallyExpanded: depth == 0,
+        dense: dense,
         controlAffinity: ListTileControlAffinity.leading,
-        title: Text(node.title,
-            maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: lessons.isEmpty ? null : Text('${lessons.length} 个课程'),
+        title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: dense || lessons.isEmpty ? null : Text('${lessons.length} 课'),
+        onExpansionChanged: (_) => onSelect(node.id),
         children: [
           for (final l in lessons)
-            _LessonTile(lesson: l),
+            _LessonRow(lesson: l),
           for (final c in node.children!)
             _ChapterTile(
               node: c,
               app: app,
-              initiallyExpanded: initiallyExpanded,
+              selectedId: selectedId,
+              onSelect: onSelect,
+              dense: dense,
               depth: depth + 1,
             ),
         ],
       ),
     );
   }
-
-  void _openLessons(BuildContext context, String title, List<Lesson> lessons) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _LessonSheetPage(title: title, lessons: lessons),
-      ),
-    );
-  }
 }
 
-class _LessonTile extends StatelessWidget {
-  const _LessonTile({required this.lesson});
+class _LessonRow extends StatelessWidget {
+  const _LessonRow({required this.lesson});
 
   final Lesson lesson;
 
   @override
   Widget build(BuildContext context) {
-    final entry = context
-        .read<AppController>()
-        .watchEntryOf(lesson.id);
+    final entry = context.read<AppController>().watchEntryOf(lesson.id);
     return Padding(
-      padding: const EdgeInsets.only(left: 8),
+      padding: const EdgeInsets.only(left: 26),
       child: ListTile(
         dense: true,
-        leading: lesson.isCoursePackage
-            ? Icon(Icons.play_circle_outline,
-                color: Theme.of(context).colorScheme.primary)
-            : const Icon(Icons.description_outlined, size: 20),
+        visualDensity: VisualDensity.compact,
+        leading: Icon(
+          lesson.isCoursePackage
+              ? Icons.play_circle_outline
+              : Icons.description_outlined,
+          size: 18,
+          color: lesson.isCoursePackage
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.outline,
+        ),
         title: Text(lesson.title,
-            maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: entry == null
-            ? null
-            : const Icon(Icons.history, size: 16),
-        onTap: () => _open(context, lesson),
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
+        trailing: entry == null ? null : const Icon(Icons.history, size: 14),
+        onTap: () => _open(context),
       ),
     );
   }
 
-  void _open(BuildContext context, Lesson lesson) {
+  void _open(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PlayerPage(resId: lesson.id, title: lesson.title),
@@ -237,81 +260,167 @@ class _LessonTile extends StatelessWidget {
   }
 }
 
-class _LessonSheetPage extends StatelessWidget {
-  const _LessonSheetPage({required this.title, required this.lessons});
+/// Lesson cards of the selected chapter with lazily fetched covers.
+class _LessonPane extends StatelessWidget {
+  const _LessonPane({required this.chapter, required this.lessons});
 
-  final String title;
+  final ChapterNode chapter;
   final List<Lesson> lessons;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: ListView(
-        children: [for (final l in lessons) _LessonTile(lesson: l)],
-      ),
+    final coursePkgs = lessons.where((l) => l.isCoursePackage).toList();
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              chapter.title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        if (coursePkgs.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: Text('本章暂无课程包')),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            sliver: SliverList.builder(
+              itemCount: coursePkgs.length,
+              itemBuilder: (context, i) =>
+                  _LessonCard(lesson: coursePkgs[i]),
+            ),
+          ),
+      ],
     );
   }
 }
 
-/// Right pane on desktop: lessons of the selected/first chapter inline.
-class _LessonPane extends StatelessWidget {
-  const _LessonPane();
+class _LessonCard extends StatefulWidget {
+  const _LessonCard({required this.lesson});
 
+  final Lesson lesson;
+
+  @override
+  State<_LessonCard> createState() => _LessonCardState();
+}
+
+class _LessonCardState extends State<_LessonCard> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppController>();
-    final coursePkg =
-        app.lessons.where((l) => l.isCoursePackage).toList();
-    if (coursePkg.isEmpty) {
-      return const Center(child: Text('本章暂无课程包'));
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: coursePkg.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final l = coursePkg[i];
-        final entry = app.watchEntryOf(l.id);
-        return Card(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            leading: const _CoverThumb(),
-            title: Text(l.title,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: entry == null
-                ? Text(l.week ?? '国家课程')
-                : Text('看到 ${entry.positionSec.round()} 秒'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) =>
-                    PlayerPage(resId: l.id, title: l.title),
-              ),
+    final entry = app.watchEntryOf(widget.lesson.id);
+    final cover = app.coverUrlOf(widget.lesson.id);
+    final progress = entry != null && entry.durationSec > 0
+        ? (entry.positionSec / entry.durationSec).clamp(0.0, 1.0)
+        : null;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  PlayerPage(resId: widget.lesson.id, title: widget.lesson.title),
             ),
           ),
-        );
-      },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                _Cover(coverUrl: cover),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.lesson.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 15)),
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                          if (widget.lesson.week != null) widget.lesson.week!,
+                          if (entry != null)
+                            '看到 ${(entry.positionSec / 60).floor()} 分钟'
+                          else
+                            '国家课程',
+                        ].join(' · '),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (progress != null) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 3,
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(Icons.play_circle_fill,
+                    color: Theme.of(context).colorScheme.primary, size: 34),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _CoverThumb extends StatelessWidget {
-  const _CoverThumb();
+class _Cover extends StatelessWidget {
+  const _Cover({this.coverUrl});
+
+  final Uri? coverUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 64,
-      height: 40,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        color: Theme.of(context).colorScheme.primaryContainer,
+    if (coverUrl == null) {
+      return Container(
+        width: 116,
+        height: 66,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: Theme.of(context).colorScheme.primaryContainer,
+        ),
+        child: Icon(Icons.play_arrow_rounded,
+            size: 30, color: Theme.of(context).colorScheme.onPrimaryContainer),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        coverUrl.toString(),
+        width: 116,
+        height: 66,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Container(
+          width: 116,
+          height: 66,
+          color: Theme.of(context).colorScheme.primaryContainer,
+        ),
       ),
-      child: Icon(Icons.play_arrow_rounded,
-          color: Theme.of(context).colorScheme.onPrimaryContainer),
     );
   }
 }
@@ -359,13 +468,11 @@ class _TextbookPickerDialogState extends State<_TextbookPickerDialog> {
                 label: label,
                 options: _optionsFor(tree, sel, dim),
                 selected: _selectedId(sel, dim),
-                onPick: (id) => app.updateSelection(
-                  _withDim(sel, dim, id),
-                ),
+                onPick: (id) =>
+                    app.updateSelection(_withDim(sel, dim, id)),
               ),
             const Divider(height: 24),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
+            Flexible(
               child: _MaterialMatches(sel: sel),
             ),
           ],
@@ -404,8 +511,12 @@ class _TextbookPickerDialogState extends State<_TextbookPickerDialog> {
             clearVolume: true,
             clearOldNew: true),
         'zxxxk' => sel.copyWith(
-            subjectId: id, clearEdition: true, clearVolume: true, clearOldNew: true),
-        'zxxbb' => sel.copyWith(editionId: id, clearVolume: true, clearOldNew: true),
+            subjectId: id,
+            clearEdition: true,
+            clearVolume: true,
+            clearOldNew: true),
+        'zxxbb' =>
+          sel.copyWith(editionId: id, clearVolume: true, clearOldNew: true),
         'zxxcc' => sel.copyWith(volumeId: id, clearOldNew: true),
         _ => sel.copyWith(oldNewId: id),
       };
@@ -415,16 +526,16 @@ class _TextbookPickerDialogState extends State<_TextbookPickerDialog> {
     for (final d in _dims) {
       final id = _selectedId(sel, d.$1);
       if (d.$1 == dim) return level;
-      final match = level.where((n) => n.id == id).firstOrNull;
-      if (match == null) return d.$1 == dim ? level : const [];
+      if (id == null) return const [];
+      TagNode? match;
+      for (final n in level) {
+        if (n.id == id) match = n;
+      }
+      if (match == null) return const [];
       level = match.children;
     }
     return const [];
   }
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }
 
 class _DimRow extends StatelessWidget {
@@ -449,10 +560,8 @@ class _DimRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: Theme.of(context).colorScheme.outline)),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -460,7 +569,7 @@ class _DimRow extends StatelessWidget {
             children: [
               for (final o in options)
                 ChoiceChip(
-                  label: Text(o.name),
+                  label: Text(o.name, style: const TextStyle(fontSize: 13)),
                   selected: selected == o.id,
                   onSelected: (on) => onPick(on ? o.id : null),
                 ),
@@ -503,7 +612,8 @@ class _MaterialMatches extends StatelessWidget {
           ListTile(
             dense: true,
             selected: app.material?.id == m.id,
-            title: Text(m.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: Text(m.title,
+                maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text(
               [m.tags['zxxbb'], m.tags['zxxcc'], m.tags['zxxxjjc']]
                   .whereType<String>()
