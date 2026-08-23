@@ -78,7 +78,7 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
                   final prefs = await SharedPreferences.getInstance();
                   final saved = prefs.getInt(_key) ?? 1;
                   if (saved > 1 && saved <= document.pages.length) {
-                    controller.goToPage(pageNumber: saved);
+                    _goToPageSafe(controller, saved);
                   }
                 },
                 onPageChanged: (pageNumber) {
@@ -121,9 +121,19 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
   }
 
   void _jump(int page) {
+    if (_pages == 0) return;
     final clamped = page.clamp(1, _pages);
     setState(() => _page = clamped);
     _savePage(clamped);
-    _controller.goToPage(pageNumber: clamped);
+    _goToPageSafe(_controller, clamped);
+  }
+
+  /// pdfrx's goToPage dereferences its page layout, which is null until the
+  /// first layout pass finishes; dragging the slider in that window throws.
+  /// The state already carries the target page, so dropping the jump is safe.
+  void _goToPageSafe(PdfViewerController controller, int page) {
+    try {
+      controller.goToPage(pageNumber: page);
+    } catch (_) {}
   }
 }
