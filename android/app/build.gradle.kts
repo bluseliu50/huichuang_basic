@@ -7,7 +7,9 @@ plugins {
 
 android {
     namespace = "dev.huichuang.huichuang_basic"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_secure_storage v11 compiles against SDK 37 (backward
+    // compatible); pin it instead of following flutter.compileSdkVersion (36).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
