@@ -1,0 +1,518 @@
+{
+  "id": "a48085cc-72d5-4872-b51c-289a3938cb09",
+  "global_title": {
+    "zh-CN": "习作：写观察日记"
+  },
+  "relations": {
+    "national_course_resource": [
+      {
+        "id": "2fb7acfe-5481-11eb-96b8-fa20200c3759",
+        "title": "视频课程",
+        "resource_type_code_name": "微课视频",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bkks",
+            "tag_name": "第一课时"
+          },
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "视频课程"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2fb7acfe-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/d5af6af8-b3a1-4588-8fac-f17f9549ee09-1920x1080-true-11d584c2c0a33231a2ea50c90fc01619-1c2e37a5b9424af7806770a1fdb4febf.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2fb7acfe-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/d5af6af8-b3a1-4588-8fac-f17f9549ee09-640x360-true-865a772bb25ad8b559df329253980646-4bf16e282afc4495bf90c4819ba6ff31.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2fb7acfe-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/d5af6af8-b3a1-4588-8fac-f17f9549ee09-852x480-true-b1d34e44033cef07f0600ba9bacf0a66-94550e9b77a44aa28044ec000689376c.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2fb7acfe-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/d5af6af8-b3a1-4588-8fac-f17f9549ee09-1280x720-true-e2304e270175f8c29b033c1e563d221d-cc6344123e954e80a0542ae4a11f771d.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2fb7acfe-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/d5af6af8-b3a1-4588-8fac-f17f9549ee09-1920x1080-true-11d584c2c0a33231a2ea50c90fc01619-1c2e37a5b9424af7806770a1fdb4febf.m3u8"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/video/17ba286b547a11eb96b8fa20200c3759/cover/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "d3323273-00ad-9cfa-d8e8-c9e0f0f3204f",
+        "title": "课件",
+        "resource_type_code_name": "课件",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "课件"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/d3323273-00ad-9cfa-d8e8-c9e0f0f3204f.t/zh-CN/1697516996612/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/d3323273-00ad-9cfa-d8e8-c9e0f0f3204f.t/zh-CN/1697516996612/transcode/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "superboard",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/d3323273-00ad-9cfa-d8e8-c9e0f0f3204f.t/zh-CN/1727683363931/transcode/692c5875-e4c1-462c-8989-1fe6b79abf20/document.superboard"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/d3323273-00ad-9cfa-d8e8-c9e0f0f3204f.t/zh-CN/1697516996612/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/d3323273-00ad-9cfa-d8e8-c9e0f0f3204f.t/zh-CN/1697516996612/transcode/image/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cb58291f-77ac-0d48-9c17-962b62250231",
+        "title": "教学设计",
+        "resource_type_code_name": "教学设计",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "教学设计"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/cb58291f-77ac-0d48-9c17-962b62250231.t/zh-CN/1697523873841/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/cb58291f-77ac-0d48-9c17-962b62250231.t/zh-CN/1697523873841/transcode/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/cb58291f-77ac-0d48-9c17-962b62250231.t/zh-CN/1697523873841/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/cb58291f-77ac-0d48-9c17-962b62250231.t/zh-CN/1697523873841/transcode/image/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "3caef0eb-5481-11eb-96b8-fa20200c3759",
+        "title": "学习任务单",
+        "resource_type_code_name": "学习任务单",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bkks",
+            "tag_name": "第一课时"
+          },
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "学习任务单"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc10752547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc10752547a11eb96b8fa20200c3759/html"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc10752547a11eb96b8fa20200c3759/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc10752547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc10752547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc10752547a11eb96b8fa20200c3759/thumbnail"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc10752547a11eb96b8fa20200c3759/image/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "3cbdbd66-5481-11eb-96b8-fa20200c3759",
+        "title": "课后练习",
+        "resource_type_code_name": "课后练习",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bkks",
+            "tag_name": "第一课时"
+          },
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "课后练习"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bcabd40547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bcabd40547a11eb96b8fa20200c3759/html"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bcabd40547a11eb96b8fa20200c3759/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bcabd40547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bcabd40547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bcabd40547a11eb96b8fa20200c3759/thumbnail"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bcabd40547a11eb96b8fa20200c3759/image/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "2faf89c7-5481-11eb-96b8-fa20200c3759",
+        "title": "视频课程",
+        "resource_type_code_name": "微课视频",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bkks",
+            "tag_name": "第二课时"
+          },
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "视频课程"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2faf89c7-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/a60c04e9-c003-4f48-9135-2f8db05b6ca5-1920x1080-true-efbaa085f60324497b18d9470553b2c3-f2d0db40832b4d6294ec74159cece52f.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2faf89c7-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/a60c04e9-c003-4f48-9135-2f8db05b6ca5-640x360-true-7731808b099e83a120424c193774e0bc-92e92a48adff47128f8118df51415d04.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2faf89c7-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/a60c04e9-c003-4f48-9135-2f8db05b6ca5-852x480-true-65cf48bbc039ae3621e02783febb3422-66bdcd7e9f914a72bae3c1f466ec1175.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2faf89c7-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/a60c04e9-c003-4f48-9135-2f8db05b6ca5-1280x720-true-18c0813f96654d0da70ecf975a712d96-159dfffdeced4f0d85fa17f8dcb12b28.m3u8"
+            ]
+          },
+          {
+            "ti_format": "m3u8",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/assets/2faf89c7-5481-11eb-96b8-fa20200c3759.t/zh-CN/1703758936297/videos/a60c04e9-c003-4f48-9135-2f8db05b6ca5-1920x1080-true-efbaa085f60324497b18d9470553b2c3-f2d0db40832b4d6294ec74159cece52f.m3u8"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/video/17b4c4df547a11eb96b8fa20200c3759/cover/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "4cdc34f0-0e3f-cdd0-e46c-4fac07d63905",
+        "title": "课件",
+        "resource_type_code_name": "课件",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "课件"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/4cdc34f0-0e3f-cdd0-e46c-4fac07d63905.t/zh-CN/1697516998111/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/4cdc34f0-0e3f-cdd0-e46c-4fac07d63905.t/zh-CN/1697516998111/transcode/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "json",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/4cdc34f0-0e3f-cdd0-e46c-4fac07d63905.t/zh-CN/1697516998111/transcode/习作：写观察日记（第二课时）.json"
+            ]
+          },
+          {
+            "ti_format": "superboard",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/4cdc34f0-0e3f-cdd0-e46c-4fac07d63905.t/zh-CN/1727683364012/transcode/6b382dd0-1302-4523-9a21-8b52a32f6f96/document.superboard"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/4cdc34f0-0e3f-cdd0-e46c-4fac07d63905.t/zh-CN/1697516998111/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/coursewares/4cdc34f0-0e3f-cdd0-e46c-4fac07d63905.t/zh-CN/1697516998111/transcode/image/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "e2dec51f-3d91-c4c2-847d-b0971cc15d0d",
+        "title": "教学设计",
+        "resource_type_code_name": "教学设计",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "教学设计"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/e2dec51f-3d91-c4c2-847d-b0971cc15d0d.t/zh-CN/1697523874284/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/e2dec51f-3d91-c4c2-847d-b0971cc15d0d.t/zh-CN/1697523874284/transcode/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/e2dec51f-3d91-c4c2-847d-b0971cc15d0d.t/zh-CN/1697523874284/transcode/image"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/esp/lesson_plandesign/e2dec51f-3d91-c4c2-847d-b0971cc15d0d.t/zh-CN/1697523874284/transcode/image/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "3cc1c053-5481-11eb-96b8-fa20200c3759",
+        "title": "学习任务单",
+        "resource_type_code_name": "学习任务单",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bkks",
+            "tag_name": "第二课时"
+          },
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "学习任务单"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bce3b63547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bce3b63547a11eb96b8fa20200c3759/html"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bce3b63547a11eb96b8fa20200c3759/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bce3b63547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bce3b63547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bce3b63547a11eb96b8fa20200c3759/thumbnail"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bce3b63547a11eb96b8fa20200c3759/image/1.jpg"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "3cad0126-5481-11eb-96b8-fa20200c3759",
+        "title": "课后练习",
+        "resource_type_code_name": "课后练习",
+        "tag_list": [
+          {
+            "tag_dimension_id": "bkks",
+            "tag_name": "第二课时"
+          },
+          {
+            "tag_dimension_id": "bklx",
+            "tag_name": "课后练习"
+          }
+        ],
+        "ti_items": [
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc012ae547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc012ae547a11eb96b8fa20200c3759/html"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc012ae547a11eb96b8fa20200c3759/image"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc012ae547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "pdf",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc012ae547a11eb96b8fa20200c3759/pdf.pdf"
+            ]
+          },
+          {
+            "ti_format": "folder",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc012ae547a11eb96b8fa20200c3759/thumbnail"
+            ]
+          },
+          {
+            "ti_format": "jpg",
+            "ti_storages": [
+              "https://r1-ndr-private.ykt.cbern.com.cn/edu_product/65/document/1bc012ae547a11eb96b8fa20200c3759/image/1.jpg"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

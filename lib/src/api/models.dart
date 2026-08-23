@@ -180,6 +180,7 @@ class RelatedResource {
     required this.storages,
     this.typeName,
     this.coverUrl,
+    this.periodName,
   });
 
   final String id;
@@ -188,6 +189,7 @@ class RelatedResource {
   final List<Uri> storages; // r1/r2/r3 mirrors, in preference order
   final String? typeName; // 微课视频 / 课件 / 教学设计 / …
   final Uri? coverUrl; // jpg cover embedded in the same pack (video entries)
+  final String? periodName; // bkks tag: 第一课时 / 第二课时 / …
 
   bool get isVideo => format == 'm3u8';
 
@@ -222,6 +224,7 @@ class RelatedResource {
       storages: storages,
       typeName: j['resource_type_code_name'] as String?,
       coverUrl: cover,
+      periodName: TeachingMaterial._tagMap(j, 'tag_name')['bkks'],
     );
   }
 
@@ -257,6 +260,17 @@ class RelatedResource {
   }
 }
 
+/// One 备课课时 inside a course package: its video plus 课件/教学设计/
+/// 学习任务单/课后练习. 课件 and 教学设计 carry no bkks tag — the n-th
+/// untagged resource of a kind maps to the n-th period.
+class LessonPeriod {
+  const LessonPeriod({required this.name, this.video, this.docs = const []});
+
+  final String name; // 第一课时 / 第二课时 / …
+  final RelatedResource? video;
+  final List<RelatedResource> docs;
+}
+
 class ResourceDetail {
   const ResourceDetail({
     required this.id,
@@ -280,6 +294,39 @@ class ResourceDetail {
       if (r.isVideo) return r;
     }
     return null;
+  }
+
+  /// 备课课时 breakdown of the pack; empty when the course is a single
+  /// undivided lesson (fewer than two bkks-tagged videos).
+  List<LessonPeriod> get periods {
+    final videos = <String, RelatedResource>{};
+    for (final r in related) {
+      final name = r.periodName;
+      if (r.isVideo && name != null && !videos.containsKey(name)) {
+        videos[name] = r;
+      }
+    }
+    if (videos.length < 2) return const [];
+
+    final periods = [
+      for (final e in videos.entries)
+        LessonPeriod(name: e.key, video: e.value, docs: <RelatedResource>[]),
+    ];
+    final byName = {for (final p in periods) p.name: p};
+    final untaggedCount = <String, int>{};
+    for (final r in related) {
+      if (r.isVideo) continue;
+      var name = r.periodName;
+      if (name == null || !byName.containsKey(name)) {
+        // 课件/教学设计 arrive untagged; the n-th of a kind belongs to
+        // the n-th period.
+        final kind = r.typeName ?? r.title;
+        final n = (untaggedCount[kind] = (untaggedCount[kind] ?? 0) + 1);
+        name = periods[n - 1].name;
+      }
+      byName[name]!.docs.add(r);
+    }
+    return periods;
   }
 
   /// `global_title` may be `{"zh-CN": "…"}` or a plain string.

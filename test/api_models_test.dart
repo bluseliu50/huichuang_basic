@@ -92,6 +92,36 @@ void main() {
       expect(d.related.map((r) => r.format), containsAll(['txt', 'folder']));
       expect(pdf.first.coverUrl, isNotNull); // jpg cover captured
     });
+
+    group('periods', () {
+      final d = ResourceDetail.fromJson(fixture('resource_detail_periods.json'));
+
+      test('splits bkks-tagged packs into periods', () {
+        final periods = d.periods;
+        expect(periods.map((p) => p.name), ['第一课时', '第二课时']);
+        for (final p in periods) {
+          expect(p.video, isNotNull);
+          expect(p.video!.isVideo, isTrue);
+        }
+      });
+
+      test('docs follow their period — tagged directly, untagged by order',
+          () {
+        final periods = d.periods;
+        for (final p in periods) {
+          final kinds = p.docs.map((r) => r.typeName).toSet();
+          // 课件/教学设计 are untagged: the n-th of a kind joins the n-th
+          // period; 学习任务单/课后练习 carry bkks directly.
+          expect(kinds, containsAll(['课件', '教学设计', '学习任务单', '课后练习']));
+          expect(p.docs.length, 4);
+        }
+      });
+
+      test('single-period packs yield no breakdown', () {
+        expect(ResourceDetail.fromJson(fixture('resource_detail.json')).periods,
+            isEmpty);
+      });
+    });
   });
 
   group('TokenBundle', () {
