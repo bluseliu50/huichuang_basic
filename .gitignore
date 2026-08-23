@@ -1,3 +1,7 @@
+# ---- Handoff / transfer docs (never commit, delete after use) ----
+handoff*.md
+HANDOFF*.md
+
 # ---- Secrets & credentials — NEVER COMMIT (policy in AGENTS.md) ----
 .env*
 **/*.env
