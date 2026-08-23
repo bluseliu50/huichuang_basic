@@ -172,6 +172,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 900;
     final body = _loading
         ? const Center(child: CircularProgressIndicator())
         : _error != null
@@ -187,18 +188,30 @@ class _PlayerPageState extends State<PlayerPage> {
                   _load();
                 },
               )
-            : Column(
-                children: [
-                  Expanded(
-                    flex: 5,
-                    child: _buildVideo(context),
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: _buildBelow(context),
-                  ),
-                ],
-              );
+            : wide
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Video as large as possible, docked left.
+                      Expanded(child: _buildVideoMax(context)),
+                      SizedBox(
+                        width: 360,
+                        child: _buildSidebar(context),
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: _buildVideo(context),
+                      ),
+                      Expanded(
+                        flex: 4,
+                        child: _buildBelow(context),
+                      ),
+                    ],
+                  );
 
     return Scaffold(
       appBar: AppBar(
@@ -223,6 +236,148 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Wide layout: video fills the whole left pane (letterboxed by mpv).
+  Widget _buildVideoMax(BuildContext context) {
+    final c = _controller;
+    if (c == null) return const SizedBox.shrink();
+    return ColoredBox(
+      color: Colors.black,
+      child: Video(
+        controller: c,
+        controls: (state) => _HuichuangControls(
+          state: state,
+          isDesktop: _isDesktop,
+        ),
+      ),
+    );
+  }
+
+  /// Sibling lessons of the current one, resolvable only when the open
+  /// material matches this player's context.
+  (String, List<Lesson>)? _chapterLessons() {
+    final app = _appController;
+    final material = app?.material;
+    if (app == null || material == null) return null;
+    if (material.id != (widget.tmId ?? material.id)) return null;
+    Lesson? current;
+    for (final l in app.lessons) {
+      if (l.id == widget.resId) current = l;
+    }
+    final leaf = current?.chapterIds;
+    if (leaf == null || leaf.isEmpty) return null;
+    ChapterNode? chapter;
+    void walk(List<ChapterNode> nodes) {
+      for (final n in nodes) {
+        if (n.id == leaf.last) chapter = n;
+        final kids = n.children;
+        if (kids != null && kids.isNotEmpty) walk(kids);
+      }
+    }
+
+    walk(app.chapters);
+    final hit = chapter;
+    if (hit == null) return null;
+    return (hit.title, app.lessonsFor(hit));
+  }
+
+  Widget _buildSidebar(BuildContext context) {
+    final d = _detail;
+    if (d == null) return const SizedBox.shrink();
+    final docs = d.related.where((r) => !r.isVideo).toList();
+    final chapter = _chapterLessons();
+    final app = _appController;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_resumeAt != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '已从上次位置继续（${_resumeAt!.round()} 秒处）',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+          ),
+        Text(d.title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          [
+            if (d.teachers.isNotEmpty) d.teachers.join('、'),
+            if (d.provider != null) d.provider!,
+          ].join(' · '),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+        ),
+        if (chapter != null) ...[
+          const SizedBox(height: 16),
+          Text('课时选择 · ${chapter.$1}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          for (final l in chapter.$2)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              selected: l.id == widget.resId,
+              selectedTileColor:
+                  Theme.of(context).colorScheme.secondaryContainer,
+              leading: Icon(
+                l.isCoursePackage
+                    ? Icons.play_circle_outline
+                    : Icons.description_outlined,
+                size: 18,
+                color: l.id == widget.resId
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.outline,
+              ),
+              title: Text(l.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13.5)),
+              onTap: () => Navigator.of(context).pushReplacement(
+                MaterialPageRoute<void>(
+                  builder: (_) => PlayerPage(
+                    resId: l.id,
+                    title: l.title,
+                    tmId: widget.tmId ?? app?.material?.id,
+                  ),
+                ),
+              ),
+            ),
+        ],
+        if (docs.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('课时资源',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final doc in docs)
+                ActionChip(
+                  avatar: Icon(_iconFor(doc.format),
+                      size: 18, color: Theme.of(context).colorScheme.primary),
+                  label: Text(doc.typeName ?? doc.format ?? doc.title),
+                  onPressed: () => _openDoc(context, doc),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
@@ -561,7 +716,10 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
       child: KeyboardListener(
       focusNode: _focusNode,
       onKeyEvent: _onKey,
-      child: Listener(
+      child: MouseRegion(
+        // Desktop: hovering reveals the control bar — no click needed.
+        onHover: widget.isDesktop ? (_) => _poke() : null,
+        child: Listener(
         onPointerDown: (e) {
           _onPointerDown(e);
           _poke();
@@ -689,6 +847,7 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
               ),
             ],
           ),
+        ),
         ),
       ),
       ),
