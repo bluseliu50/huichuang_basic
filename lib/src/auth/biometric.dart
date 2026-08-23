@@ -26,7 +26,8 @@ class SystemBiometricGate implements BiometricGate {
       final can = await _auth.canCheckBiometrics;
       final supported = await _auth.isDeviceSupported();
       return can && supported;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('biometric availability check failed: $e');
       return false;
     }
   }
@@ -49,7 +50,8 @@ class SystemBiometricGate implements BiometricGate {
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('biometric authenticate failed: $e');
       return false;
     }
   }
