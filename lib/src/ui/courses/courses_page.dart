@@ -19,7 +19,7 @@ class CoursesPage extends StatelessWidget {
             onPressed: () => showTextbookPicker(context),
             icon: const Icon(Icons.tune, size: 18),
             label: Text(
-              app.material?.title ?? '选择教材',
+              _gradeEditionLabel(app) ?? '年级与版本',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 13),
@@ -35,7 +35,105 @@ class CoursesPage extends StatelessWidget {
                   message: '目录加载失败，请检查网络后重试',
                   onRetry: () => app.retryCatalog(),
                 )
-              : const _BrowserBody(),
+              : Column(
+                  children: [
+                    const _SubjectBar(),
+                    const Divider(height: 1),
+                    const Expanded(child: _BrowserBody()),
+                  ],
+                ),
+    );
+  }
+}
+
+/// "一年级 · 统编版"-style label for the app-bar filter button.
+String? _gradeEditionLabel(AppController app) {
+  final tree = app.catalog.tagTree;
+  String? name(String? id) {
+    if (tree == null || id == null) return null;
+    String? hit;
+    void walk(List<TagNode> level) {
+      for (final n in level) {
+        if (n.id == id) hit = n.name;
+        walk(n.children);
+      }
+    }
+    walk(tree.roots);
+    return hit;
+  }
+
+  final parts = [name(app.selection.gradeId), name(app.selection.editionId)]
+      .whereType<String>()
+      .toList();
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
+/// Prominent subject switcher of the current stage; grade & edition are
+/// adjusted through the app-bar filter button / cascading dialog.
+class _SubjectBar extends StatelessWidget {
+  const _SubjectBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppController>();
+    final tree = app.catalog.tagTree;
+    if (tree == null || tree.roots.isEmpty) return const SizedBox.shrink();
+    final sel = app.selection;
+
+    TagNode? stage;
+    for (final n in tree.roots) {
+      if (n.id == sel.stageId) stage = n;
+    }
+    stage ??= tree.roots.first;
+    final stageNode = stage;
+
+    // Dedup by subject name, keeping each subject's first parent grade.
+    final seen = <String>{};
+    final subjects = <(String, TagNode)>[
+      for (final g in stage.children)
+        for (final s in g.children)
+          if (seen.add(s.name)) (g.id, s),
+    ];
+
+    return SizedBox(
+      height: 60,
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 4),
+            child: Text('学科',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelMedium
+                    ?.copyWith(color: Theme.of(context).colorScheme.outline)),
+          ),
+          Expanded(
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              itemCount: subjects.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final (gradeId, s) = subjects[i];
+                return ChoiceChip(
+                  label: Text(s.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  selected: sel.subjectId == s.id,
+                  onSelected: (on) {
+                    if (!on) return;
+                    final opened = app.selectSubject(
+                      stageId: stageNode.id,
+                      subjectId: s.id,
+                      fallbackGradeId: gradeId,
+                    );
+                    if (!opened) showTextbookPicker(context);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -455,7 +553,7 @@ class _TextbookPickerDialogState extends State<_TextbookPickerDialog> {
     final dialogMax = size.width * 0.9;
 
     return AlertDialog(
-      title: const Text('选择教材'),
+      title: const Text('筛选教材（年级 / 版本 / 册次）'),
       contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
       content: SizedBox(
         width: dialogMax > 640 ? 640 : dialogMax,
