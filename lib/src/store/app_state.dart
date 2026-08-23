@@ -167,6 +167,9 @@ class AppController extends ChangeNotifier {
 
   void updateSelection(Selection next) {
     selection = next;
+    // Remember the most recent grade so subject jumps default to it.
+    final grade = next.gradeId;
+    if (grade != null) _settings?.setString('hc_recent_grade', grade);
     notifyListeners();
     final stage = next.stageId;
     if (stage == null) return;
@@ -255,24 +258,45 @@ class AppController extends ChangeNotifier {
         }));
   }
 
-  /// Jump straight to a subject, restoring its cached grade/edition/volume.
-  /// Returns true when exactly one material matched and was opened; the
-  /// caller should surface the picker otherwise.
+  /// Jump straight to a subject, restoring its cached grade/edition/volume;
+  /// without a subject-local cache the most recently used grade wins over
+  /// the caller's fallback. Returns true when a material was opened.
   bool selectSubject({
     required String stageId,
     required String subjectId,
     String? fallbackGradeId,
   }) {
     final prefs = subjectSelectionOf(subjectId);
+    final stage = prefs?['stage'] ?? stageId;
+    var grade = prefs?['grade'];
+    if (grade == null) {
+      final recent = _settings?.getString('hc_recent_grade');
+      if (recent != null && _gradeHasSubject(stage, recent, subjectId)) {
+        grade = recent;
+      }
+    }
     updateSelection(Selection(
-      stageId: prefs?['stage'] ?? stageId,
-      gradeId: prefs?['grade'] ?? fallbackGradeId,
+      stageId: stage,
+      gradeId: grade ?? fallbackGradeId,
       subjectId: subjectId,
       editionId: prefs?['edition'],
       volumeId: prefs?['volume'],
       oldNewId: prefs?['oldNew'],
     ));
     return material != null;
+  }
+
+  bool _gradeHasSubject(String stageId, String gradeId, String subjectId) {
+    for (final s in catalog.tagTree?.roots ?? const <TagNode>[]) {
+      if (s.id != stageId) continue;
+      for (final g in s.children) {
+        if (g.id != gradeId) continue;
+        for (final sub in g.children) {
+          if (sub.id == subjectId) return true;
+        }
+      }
+    }
+    return false;
   }
 
   final Map<String, Uri?> _coverCache = {};
@@ -297,6 +321,37 @@ class AppController extends ChangeNotifier {
       }
     }).catchError((_) {
       _coverCache.remove(resId);
+    });
+    return null;
+  }
+
+  final Map<String, Uri?> _textbookCoverCache = {};
+
+  /// Cover image for an 电子教材, from its detail's embedded jpg
+  /// (ti_items); proxied when on the private CDN.
+  Uri? textbookCoverOf(String contentId) {
+    final cached = _textbookCoverCache[contentId];
+    if (cached != null) {
+      return _maybeProxy(cached);
+    }
+    if (_textbookCoverCache.containsKey(contentId)) return null; // in flight
+    _textbookCoverCache[contentId] = null;
+    client.getTextbookDetail(contentId).then((d) {
+      Uri? cover;
+      for (final r in d.related) {
+        if (r.coverUrl != null) {
+          cover = r.coverUrl;
+          break;
+        }
+      }
+      if (cover != null) {
+        _textbookCoverCache[contentId] = cover;
+        notifyListeners();
+      } else {
+        _textbookCoverCache.remove(contentId);
+      }
+    }).catchError((_) {
+      _textbookCoverCache.remove(contentId);
     });
     return null;
   }

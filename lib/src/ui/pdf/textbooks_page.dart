@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -209,21 +210,34 @@ class _BookCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color:
-                        Theme.of(context).colorScheme.primaryContainer,
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.menu_book_outlined,
-                      size: 40,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onPrimaryContainer,
-                    ),
-                  ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Builder(builder: (context) {
+                    final cover = context
+                        .watch<AppController>()
+                        .textbookCoverOf(book.id);
+                    if (cover == null) {
+                      return Container(
+                        width: double.infinity,
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        child: Icon(Icons.menu_book_outlined,
+                            size: 40,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer),
+                      );
+                    }
+                    return CachedNetworkImage(
+                      imageUrl: cover.toString(),
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorWidget: (_, _, _) => Container(
+                        width: double.infinity,
+                        color:
+                            Theme.of(context).colorScheme.primaryContainer,
+                      ),
+                    );
+                  }),
                 ),
               ),
               const SizedBox(height: 8),
