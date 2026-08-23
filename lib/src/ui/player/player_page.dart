@@ -255,8 +255,10 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  /// Sibling lessons of the current one, resolvable only when the open
-  /// material matches this player's context.
+  /// Lessons around the current one: the leaf chapter's own lessons, or —
+  /// when the leaf holds a single course — the whole enclosing unit so
+  /// sibling 课时 stay reachable. Null when the open material doesn't match
+  /// this player's context.
   (String, List<Lesson>)? _chapterLessons() {
     final app = _appController;
     final material = app?.material;
@@ -266,21 +268,39 @@ class _PlayerPageState extends State<PlayerPage> {
     for (final l in app.lessons) {
       if (l.id == widget.resId) current = l;
     }
-    final leaf = current?.chapterIds;
-    if (leaf == null || leaf.isEmpty) return null;
-    ChapterNode? chapter;
-    void walk(List<ChapterNode> nodes) {
+    final ids = current?.chapterIds;
+    if (ids == null || ids.isEmpty) return null;
+
+    ChapterNode? find(List<ChapterNode> nodes, String id) {
       for (final n in nodes) {
-        if (n.id == leaf.last) chapter = n;
-        final kids = n.children;
-        if (kids != null && kids.isNotEmpty) walk(kids);
+        if (n.id == id) return n;
+        final hit = find(n.children ?? const [], id);
+        if (hit != null) return hit;
       }
+      return null;
     }
 
-    walk(app.chapters);
-    final hit = chapter;
-    if (hit == null) return null;
-    return (hit.title, app.lessonsFor(hit));
+    List<Lesson> lessonsUnder(ChapterNode n) => [
+          ...app.lessonsFor(n),
+          for (final c in n.children ?? const <ChapterNode>[])
+            ...lessonsUnder(c),
+        ];
+
+    final leaf = find(app.chapters, ids.last);
+    if (leaf == null) return null;
+    var group = leaf;
+    var lessons = lessonsUnder(leaf);
+    if (lessons.length <= 1 && ids.length >= 2) {
+      final parent = find(app.chapters, ids[ids.length - 2]);
+      if (parent != null) {
+        final wider = lessonsUnder(parent);
+        if (wider.length > lessons.length) {
+          group = parent;
+          lessons = wider;
+        }
+      }
+    }
+    return (group.title, lessons);
   }
 
   Widget _buildSidebar(BuildContext context) {
@@ -344,16 +364,18 @@ class _PlayerPageState extends State<PlayerPage> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 13.5)),
-              onTap: () => Navigator.of(context).pushReplacement(
-                MaterialPageRoute<void>(
-                  builder: (_) => PlayerPage(
-                    resId: l.id,
-                    title: l.title,
-                    tmId: widget.tmId ?? app?.material?.id,
-                  ),
-                ),
+              onTap: l.id == widget.resId
+                  ? null
+                  : () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute<void>(
+                        builder: (_) => PlayerPage(
+                          resId: l.id,
+                          title: l.title,
+                          tmId: widget.tmId ?? app?.material?.id,
+                        ),
+                      ),
+                    ),
               ),
-            ),
         ],
         if (docs.isNotEmpty) ...[
           const SizedBox(height: 16),
