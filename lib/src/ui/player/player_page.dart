@@ -416,9 +416,6 @@ class _PlayerPageState extends State<PlayerPage> {
                                   title: Text(p.name,
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w600)),
-                                  trailing: _period?.name == p.name
-                                      ? null
-                                      : const Icon(Icons.play_arrow_rounded),
                                   onTap: _period?.name == p.name
                                       ? null
                                       : () => _switchPeriod(p),
