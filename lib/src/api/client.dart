@@ -30,8 +30,8 @@ class SmarteduClient {
             ));
 
   static const List<String> fileHosts = [
-    'https://s-file-1.ykt.cbern.com.cn',
-    'https://s-file-2.ykt.cbern.com.cn',
+    's-file-1.ykt.cbern.com.cn',
+    's-file-2.ykt.cbern.com.cn',
   ];
 
   static const String ucBase = 'https://uc-gateway.ykt.eduyun.cn';
