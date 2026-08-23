@@ -210,6 +210,7 @@ class AppController extends ChangeNotifier {
         volumeId: m.tagIds['zxxcc'],
         oldNewId: m.tagIds['zxxxjjc'],
       );
+      _rememberSubjectSelection();
     } catch (e) {
       contentPhase = LoadPhase.error;
     }
@@ -223,6 +224,55 @@ class AppController extends ChangeNotifier {
     if (m != null) {
       await openMaterial(m);
     }
+  }
+
+  // -------------------------------------------------------- subject memory
+
+  static const _subjectPrefPrefix = 'hc_subject_sel_';
+
+  /// Last-opened {stage, grade, edition, volume, oldNew} of a subject tag id,
+  /// persisted so each subject remembers its grade & textbook edition.
+  Map<String, String>? subjectSelectionOf(String subjectId) {
+    final raw = _settings?.getString('$_subjectPrefPrefix$subjectId');
+    if (raw == null) return null;
+    try {
+      return (jsonDecode(raw) as Map).cast<String, String>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _rememberSubjectSelection() {
+    final s = selection;
+    final subject = s.subjectId;
+    if (subject == null) return;
+    _settings?.setString('$_subjectPrefPrefix$subject', jsonEncode({
+          if (s.stageId != null) 'stage': s.stageId!,
+          if (s.gradeId != null) 'grade': s.gradeId!,
+          if (s.editionId != null) 'edition': s.editionId!,
+          if (s.volumeId != null) 'volume': s.volumeId!,
+          if (s.oldNewId != null) 'oldNew': s.oldNewId!,
+        }));
+  }
+
+  /// Jump straight to a subject, restoring its cached grade/edition/volume.
+  /// Returns true when exactly one material matched and was opened; the
+  /// caller should surface the picker otherwise.
+  bool selectSubject({
+    required String stageId,
+    required String subjectId,
+    String? fallbackGradeId,
+  }) {
+    final prefs = subjectSelectionOf(subjectId);
+    updateSelection(Selection(
+      stageId: prefs?['stage'] ?? stageId,
+      gradeId: prefs?['grade'] ?? fallbackGradeId,
+      subjectId: subjectId,
+      editionId: prefs?['edition'],
+      volumeId: prefs?['volume'],
+      oldNewId: prefs?['oldNew'],
+    ));
+    return material != null;
   }
 
   final Map<String, Uri?> _coverCache = {};
