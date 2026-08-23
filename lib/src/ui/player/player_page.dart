@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../api/client.dart';
@@ -40,6 +41,7 @@ class _PlayerPageState extends State<PlayerPage> {
   Player? _player;
   VideoController? _controller;
   ResourceDetail? _detail;
+  LessonPeriod? _period;
   String? _error;
   bool _loading = true;
   double? _resumeAt;
@@ -48,7 +50,6 @@ class _PlayerPageState extends State<PlayerPage> {
   StreamSubscription<String>? _errorSub;
   Duration _lastRecorded = Duration.zero;
   bool _recorded = false;
-
   bool get _isDesktop =>
       Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
@@ -75,7 +76,19 @@ class _PlayerPageState extends State<PlayerPage> {
     }
     try {
       final detail = await client.getResourceDetail(widget.resId);
-      final video = detail.video;
+      // Multi-period packs (bkks) play one 备课课时 at a time; restore the
+      // last one used.
+      final periods = detail.periods;
+      LessonPeriod? period;
+      if (periods.isNotEmpty) {
+        final remembered = (await SharedPreferences.getInstance())
+            .getString('hc_lesson_period_${widget.resId}');
+        period = periods.firstWhere(
+          (p) => p.name == remembered,
+          orElse: () => periods.first,
+        );
+      }
+      final video = period?.video ?? detail.video;
       if (video == null || video.storages.isEmpty) {
         throw StateError('该课程没有可播放的视频');
       }
@@ -123,6 +136,7 @@ class _PlayerPageState extends State<PlayerPage> {
         _player = player;
         _controller = controller;
         _detail = detail;
+        _period = period;
         _loading = false;
       });
     } catch (e) {
@@ -142,6 +156,24 @@ class _PlayerPageState extends State<PlayerPage> {
     _record();
   }
 
+  /// Switch the playing 备课课时 in place: re-register the period's mirrors
+  /// under the same resource id and reopen the (rewritten) playlist.
+  Future<void> _switchPeriod(LessonPeriod p) async {
+    final player = _player;
+    final video = p.video;
+    if (player == null || video == null || _period?.name == p.name) return;
+    final proxy = context.read<StreamProxy>();
+    proxy.register(widget.resId, video.storages);
+    setState(() {
+      _period = p;
+      _recorded = false;
+      _lastRecorded = Duration.zero;
+    });
+    unawaited((await SharedPreferences.getInstance())
+        .setString('hc_lesson_period_${widget.resId}', p.name));
+    await player.open(Media(proxy.playlistUrl(widget.resId).toString()));
+  }
+
   Future<void> _record() async {
     final p = _player;
     if (p == null) return;
@@ -152,7 +184,9 @@ class _PlayerPageState extends State<PlayerPage> {
     _recorded = true;
     await _appController?.recordWatch(
           resId: widget.resId,
-          title: _detail?.title ?? widget.title,
+          title: _period == null
+              ? (_detail?.title ?? widget.title)
+              : '${_detail?.title ?? widget.title} · ${_period!.name}',
           tmId: widget.tmId ?? _appController?.material?.id ?? '',
           positionSec: pos.inMilliseconds / 1000,
           durationSec: dur.inMilliseconds / 1000,
@@ -306,108 +340,259 @@ class _PlayerPageState extends State<PlayerPage> {
   Widget _buildSidebar(BuildContext context) {
     final d = _detail;
     if (d == null) return const SizedBox.shrink();
-    final docs = d.related.where((r) => !r.isVideo).toList();
-    final chapter = _chapterLessons();
-    final app = _appController;
+    final periods = d.periods;
+    final multi = periods.length >= 2;
+    final chapter = multi ? null : _chapterLessons();
+    final flatDocs = d.related.where((r) => !r.isVideo).toList();
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (_resumeAt != null)
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '已从上次位置继续（${_resumeAt!.round()} 秒处）',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_resumeAt != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '已从上次位置继续（${_resumeAt!.round()} 秒处）',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                    ),
                   ),
+                Text(d.title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  [
+                    if (d.teachers.isNotEmpty) d.teachers.join('、'),
+                    if (d.provider != null) d.provider!,
+                  ].join(' · '),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                ),
+              ],
             ),
           ),
-        Text(d.title, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text(
-          [
-            if (d.teachers.isNotEmpty) d.teachers.join('、'),
-            if (d.provider != null) d.provider!,
-          ].join(' · '),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
-        ),
-        if (chapter != null) ...[
-          const SizedBox(height: 16),
-          Text('课时选择 · ${chapter.$1}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          for (final l in chapter.$2)
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              selected: l.id == widget.resId,
-              selectedTileColor:
-                  Theme.of(context).colorScheme.secondaryContainer,
-              leading: Icon(
-                l.isCoursePackage
-                    ? Icons.play_circle_outline
-                    : Icons.description_outlined,
-                size: 18,
-                color: l.id == widget.resId
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline,
-              ),
-              title: Text(l.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13.5)),
-              onTap: l.id == widget.resId
-                  ? null
-                  : () => Navigator.of(context).pushReplacement(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PlayerPage(
-                          resId: l.id,
-                          title: l.title,
-                          tmId: widget.tmId ?? app?.material?.id,
-                        ),
+          const TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            tabs: [Tab(text: '课时'), Tab(text: '附件')],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                // ---- 课时: pack periods, or sibling lessons of the chapter
+                multi
+                    ? ListView(
+                        children: [
+                          for (final p in periods)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ListTile(
+                                  dense: true,
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(
+                                          horizontal: 16),
+                                  selected: _period?.name == p.name,
+                                  selectedTileColor: Theme.of(context)
+                                      .colorScheme
+                                      .secondaryContainer,
+                                  leading: Icon(Icons.play_circle_outline,
+                                      size: 20,
+                                      color: _period?.name == p.name
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .outline),
+                                  title: Text(p.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600)),
+                                  trailing: _period?.name == p.name
+                                      ? null
+                                      : const Icon(Icons.play_arrow_rounded),
+                                  onTap: _period?.name == p.name
+                                      ? null
+                                      : () => _switchPeriod(p),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 16, right: 16, bottom: 4),
+                                  child: Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      for (final doc in p.docs)
+                                        ActionChip(
+                                          avatar: Icon(_iconFor(doc.format),
+                                              size: 16,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary),
+                                          label: Text(
+                                              doc.typeName ??
+                                                  doc.format ??
+                                                  doc.title,
+                                              style: const TextStyle(
+                                                  fontSize: 12)),
+                                          onPressed: () =>
+                                              _openDoc(context, doc),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const Divider(height: 1, indent: 16),
+                              ],
+                            ),
+                        ],
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          if (chapter != null) ...[
+                            Text('课时选择 · ${chapter.$1}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            for (final l in chapter.$2)
+                              ListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                selected: l.id == widget.resId,
+                                selectedTileColor: Theme.of(context)
+                                    .colorScheme
+                                    .secondaryContainer,
+                                leading: Icon(
+                                  l.isCoursePackage
+                                      ? Icons.play_circle_outline
+                                      : Icons.description_outlined,
+                                  size: 18,
+                                  color: l.id == widget.resId
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.outline,
+                                ),
+                                title: Text(l.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13.5)),
+                                onTap: l.id == widget.resId
+                                    ? null
+                                    : () => Navigator.of(context)
+                                        .pushReplacement(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => PlayerPage(
+                                            resId: l.id,
+                                            title: l.title,
+                                            tmId: widget.tmId ??
+                                                _appController?.material?.id,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                          ] else
+                            const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Text('本课没有多课时'),
+                            ),
+                        ],
                       ),
-                    ),
-              ),
-        ],
-        if (docs.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text('课时资源',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final doc in docs)
-                ActionChip(
-                  avatar: Icon(_iconFor(doc.format),
-                      size: 18, color: Theme.of(context).colorScheme.primary),
-                  label: Text(doc.typeName ?? doc.format ?? doc.title),
-                  onPressed: () => _openDoc(context, doc),
+                // ---- 附件: every period's resources, divider per period
+                ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (multi)
+                      for (final p in periods) ...[
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(p.name,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .outline)),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final doc in p.docs)
+                                ActionChip(
+                                  avatar: Icon(_iconFor(doc.format),
+                                      size: 18,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary),
+                                  label: Text(
+                                      doc.typeName ?? doc.format ?? doc.title),
+                                  onPressed: () => _openDoc(context, doc),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ]
+                    else if (flatDocs.isNotEmpty)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final doc in flatDocs)
+                            ActionChip(
+                              avatar: Icon(_iconFor(doc.format),
+                                  size: 18,
+                                  color:
+                                      Theme.of(context).colorScheme.primary),
+                              label:
+                                  Text(doc.typeName ?? doc.format ?? doc.title),
+                              onPressed: () => _openDoc(context, doc),
+                            ),
+                        ],
+                      )
+                    else
+                      const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Text('无附件'),
+                      ),
+                  ],
                 ),
-            ],
+              ],
+            ),
           ),
         ],
-      ],
+      ),
     );
   }
 
   Widget _buildBelow(BuildContext context) {
     final d = _detail;
     if (d == null) return const SizedBox.shrink();
-    final related = d.related;
-    final docs = related.where((r) => !r.isVideo).toList();
+    final periods = d.periods;
+    final multi = periods.length >= 2;
+    final docs = multi
+        ? (_period?.docs ?? const <RelatedResource>[])
+        : d.related.where((r) => !r.isVideo).toList();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -445,6 +630,21 @@ class _PlayerPageState extends State<PlayerPage> {
             ),
           ],
         ),
+        if (multi)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                for (final p in periods)
+                  ChoiceChip(
+                    label: Text(p.name),
+                    selected: _period?.name == p.name,
+                    onSelected: (_) => _switchPeriod(p),
+                  ),
+              ],
+            ),
+          ),
         if (docs.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text('课时资源',
