@@ -219,6 +219,7 @@ class _BrowserBodyState extends State<_BrowserBody> {
           app: app,
           selectedId: selected.id,
           onSelect: (id) => setState(() => _selectedChapterId = id),
+          expandLessons: true,
         ),
       );
     }
@@ -264,6 +265,7 @@ class _ChapterTile extends StatelessWidget {
     required this.selectedId,
     required this.onSelect,
     this.dense = false,
+    this.expandLessons = false,
     this.depth = 0,
   });
 
@@ -272,6 +274,11 @@ class _ChapterTile extends StatelessWidget {
   final String selectedId;
   final void Function(String id) onSelect;
   final bool dense;
+
+  /// Narrow layout: leaf chapters carry their lessons themselves — one
+  /// lesson opens the player directly, several expand inline. The wide
+  /// pane instead selects the chapter and shows the lesson cards beside.
+  final bool expandLessons;
   final int depth;
 
   @override
@@ -281,14 +288,61 @@ class _ChapterTile extends StatelessWidget {
     final selected = selectedId == node.id;
 
     if (!hasChildren) {
+      if (!expandLessons) {
+        return Padding(
+          padding: EdgeInsets.only(left: 12.0 * depth),
+          child: ListTile(
+            dense: true,
+            selected: selected,
+            title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: lessons.isEmpty ? null : Text('${lessons.length}'),
+            onTap: () => onSelect(node.id),
+          ),
+        );
+      }
+      // Narrow: no separate lesson pane exists, so the leaf tile must
+      // expose its lessons — otherwise tapping it does nothing at all.
+      if (lessons.length == 1) {
+        final l = lessons.first;
+        return Padding(
+          padding: EdgeInsets.only(left: 12.0 * depth),
+          child: ListTile(
+            dense: true,
+            selected: selected,
+            title: Text(node.title,
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: Icon(Icons.play_circle_outline,
+                size: 20, color: Theme.of(context).colorScheme.primary),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => PlayerPage(resId: l.id, title: l.title),
+              ),
+            ),
+          ),
+        );
+      }
+      if (lessons.isEmpty) {
+        return Padding(
+          padding: EdgeInsets.only(left: 12.0 * depth),
+          child: ListTile(
+            dense: true,
+            title: Text(node.title,
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+        );
+      }
       return Padding(
-        padding: EdgeInsets.only(left: 12.0 * depth),
-        child: ListTile(
+        padding: EdgeInsets.only(left: 8.0 * depth),
+        child: ExpansionTile(
           dense: true,
-          selected: selected,
+          controlAffinity: ListTileControlAffinity.leading,
           title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: lessons.isEmpty ? null : Text('${lessons.length}'),
-          onTap: () => onSelect(node.id),
+          subtitle: Text('${lessons.length} 课'),
+          onExpansionChanged: (_) => onSelect(node.id),
+          children: [
+            for (final l in lessons)
+              _LessonRow(lesson: l),
+          ],
         ),
       );
     }
@@ -311,6 +365,7 @@ class _ChapterTile extends StatelessWidget {
               selectedId: selectedId,
               onSelect: onSelect,
               dense: dense,
+              expandLessons: expandLessons,
               depth: depth + 1,
             ),
         ],

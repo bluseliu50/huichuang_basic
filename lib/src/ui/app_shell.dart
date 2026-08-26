@@ -50,6 +50,14 @@ class _AppShellState extends State<AppShell> {
           );
         });
       }
+      // E2E hook: HC_E2E_TAB=<0-4> opens that shell tab once the catalog
+      // is ready (home/courses/textbooks/search/settings).
+      final e2eTab = int.tryParse(
+          Platform.environment['HC_E2E_TAB'] ?? '')?.clamp(0, 4);
+      if (e2eTab != null) {
+        app.catalogLoadComplete
+            .then((_) => mounted ? setState(() => _index = e2eTab) : null);
+      }
       // E2E hook: HC_E2E_LOGIN=account:password auto-opens the login card
       // and submits, opening the real webview window (captcha pending).
       final e2eLogin = Platform.environment['HC_E2E_LOGIN'];

@@ -104,46 +104,98 @@ class _TextbooksPageState extends State<TextbooksPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('教材')),
-      body: Column(
-        children: [
-          _pickerRow('学段', stages, _stageId, (id) => setState(() {
-                _stageId = id;
-                _subjectId = null;
-                _editionId = null;
-                _gradeId = null;
-              })),
-          if (subjects.isNotEmpty)
-            _pickerRow('学科', subjects, _subjectId,
-                (id) => setState(() {
-                      _subjectId = id;
+      // Pickers and book grid share ONE scroll view: on narrow screens the
+      // fixed-height picker rows would otherwise eat the viewport and leave
+      // the grid an unusable sliver. Chips wrap instead of scrolling
+      // horizontally, so every option stays visible.
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _pickerLevel('学段', stages, _stageId, (id) => setState(() {
+                      _stageId = id;
+                      _subjectId = null;
                       _editionId = null;
                       _gradeId = null;
                     })),
-          if (editions.isNotEmpty)
-            _pickerRow('版本', editions, _editionId,
-                (id) => setState(() {
-                      _editionId = id;
-                      _gradeId = null;
-                    })),
-          if (grades.isNotEmpty)
-            _pickerRow('年级', grades, _gradeId, (id) => setState(() => _gradeId = id)),
-          const Divider(height: 1),
+                if (subjects.isNotEmpty)
+                  _pickerLevel('学科', subjects, _subjectId,
+                      (id) => setState(() {
+                            _subjectId = id;
+                            _editionId = null;
+                            _gradeId = null;
+                          })),
+                if (editions.isNotEmpty)
+                  _pickerLevel('版本', editions, _editionId,
+                      (id) => setState(() {
+                            _editionId = id;
+                            _gradeId = null;
+                          })),
+                if (grades.isNotEmpty)
+                  _pickerLevel('年级', grades, _gradeId,
+                      (id) => setState(() => _gradeId = id)),
+                const Divider(height: 1),
+              ],
+            ),
+          ),
+          if (filtered.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: Text('暂无教材')),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverGrid(
+                gridDelegate:
+                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 220,
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: 0.62,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _BookCard(book: filtered[i]),
+                  childCount: filtered.length,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// One filter level: label + wrapping chips. Part of the page's single
+  /// scroll view (no horizontal scrolling, nothing hidden off-screen).
+  Widget _pickerLevel(String label, List<TagNode> options, String? selected,
+      void Function(String?) onPick) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 12, right: 8),
+            child: Text(label,
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontSize: 13)),
+          ),
           Expanded(
-            child: filtered.isEmpty
-                ? const Center(child: Text('暂无教材'))
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 220,
-                      mainAxisSpacing: 14,
-                      crossAxisSpacing: 14,
-                      childAspectRatio: 0.62,
-                    ),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) =>
-                        _BookCard(book: filtered[i]),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final o in options)
+                  ChoiceChip(
+                    label: Text(o.name),
+                    selected: selected == o.id,
+                    onSelected: (on) => onPick(on ? o.id : null),
                   ),
+              ],
+            ),
           ),
         ],
       ),
@@ -156,40 +208,6 @@ class _TextbooksPageState extends State<TextbooksPage> {
       if (n.id == id) return n.children;
     }
     return const [];
-  }
-
-  Widget _pickerRow(String label, List<TagNode> options, String? selected,
-      void Function(String?) onPick) {
-    return SizedBox(
-      height: 56,
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 16, right: 4),
-            child: Text(label,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.outline,
-                    fontSize: 13)),
-          ),
-          Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              itemCount: options.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final o = options[i];
-                return ChoiceChip(
-                  label: Text(o.name),
-                  selected: selected == o.id,
-                  onSelected: (on) => onPick(on ? o.id : null),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
