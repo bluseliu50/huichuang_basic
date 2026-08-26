@@ -131,11 +131,14 @@ jobs:
           # (RPATH $ORIGIN/lib); place it under usr/bin as the AppDir payload.
           install -d AppDir/usr/bin
           cp -r build/linux/x64/release/bundle/. AppDir/usr/bin/
+          # linuxdeploy validates icon resolutions; render the master into
+          # a valid 512x512 instead of passing the 1254x1254 original.
+          magick assets/icon.png -resize 512x512 icon-512.png
           OUTPUT="huichuang_basic-v${APP_VERSION}-linux-x64.AppImage" \
             ./linuxdeploy-x86_64.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/huichuang_basic \
             --desktop-file packaging/linux/huichuang_basic.desktop \
-            --icon-file assets/icon.png \
+            --icon-file icon-512.png \
             --plugin gtk --output appimage
       - name: Package (Windows installer)
         if: runner.os == 'Windows'
