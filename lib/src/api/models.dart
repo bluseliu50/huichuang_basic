@@ -195,11 +195,16 @@ class RelatedResource {
 
   factory RelatedResource.fromJson(Map<String, dynamic> j) {
     final items = (j['ti_items'] as List? ?? const []).cast<Map>();
-    // The format of the first item that has one drives this resource; packs
-    // may also embed covers (jpg) which must not leak into storages.
+    // The first previewable format drives this resource. Platform packs
+    // prepend non-file meta items — folder = transcode bundle directory,
+    // superboard = interactive whiteboard, jpg = cover — none of which is a
+    // usable file; picking them sent docs down the download path with a
+    // directory URL instead of the embedded pdf.
+    const metaFormats = {'folder', 'superboard', 'jpg'};
     final format = items
         .map((t) => t['ti_format'] as String?)
-        .firstWhere((f) => f != null && f.isNotEmpty, orElse: () => null);
+        .firstWhere((f) => f != null && !metaFormats.contains(f),
+            orElse: () => null);
     final storages = <Uri>[];
     Uri? cover;
     for (final item in items) {

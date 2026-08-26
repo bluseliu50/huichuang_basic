@@ -93,6 +93,20 @@ void main() {
       expect(pdf.first.coverUrl, isNotNull); // jpg cover captured
     });
 
+    test('doc packs report the embedded pdf, not the folder/superboard meta',
+        () {
+      // 课件/教学设计 packs list a transcode `folder` and a `superboard`
+      // before the real file; the previewable format must win.
+      final d = ResourceDetail.fromJson(fixture('resource_detail.json'));
+      final courseware =
+          d.related.where((r) => r.typeName == '课件').toList();
+      expect(courseware, hasLength(1));
+      expect(courseware.first.format, 'pdf');
+      for (final u in courseware.first.storages) {
+        expect(u.path, endsWith('.pdf'));
+      }
+    });
+
     group('periods', () {
       final d = ResourceDetail.fromJson(fixture('resource_detail_periods.json'));
 
