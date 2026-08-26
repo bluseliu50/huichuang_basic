@@ -42,9 +42,11 @@ class _SettingsPageState extends State<SettingsPage> {
             secondary: const Icon(Icons.fingerprint),
             title: const Text('生物识别保护凭证'),
             subtitle: Text(
-              auth.vaultAvailable
-                  ? '仅在需要读取已保存密码时要求验证，启动时不询问'
-                  : '当前系统没有可用的安全存储，无法保存密码；登录状态将以本地缓存保留',
+              !auth.vaultAvailable
+                  ? '当前系统没有可用的安全存储，无法保存密码；登录状态将以本地缓存保留'
+                  : _biometricsAvailable
+                      ? '仅在需要读取已保存密码时要求验证，启动时不询问'
+                      : '未检测到指纹／面容等生物识别支持，保护暂不可用',
             ),
             value: auth.biometricProtect,
             // Grayed out and forced off when either the biometric

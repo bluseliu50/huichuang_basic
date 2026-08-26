@@ -213,7 +213,13 @@ class _LoginCardState extends State<LoginCard> {
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.outline),
               )
-            else if (_biometricsAvailable)
+            else if (!_biometricsAvailable)
+              Text(
+                '未检测到指纹／面容等生物识别支持，保护暂不可用',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline),
+              )
+            else
               Text(
                 '开启后，登录及读取、保存密码需先验证指纹／面容；启动应用时不会询问。取消验证可手动输入账号密码。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

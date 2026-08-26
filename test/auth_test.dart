@@ -235,4 +235,20 @@ void main() {
     await c3.logout();
     expect(await cacheFile.exists(), isFalse, reason: 'logout clears cache');
   });
+
+  test('no biometric provider disables protection but keeps saving', () async {
+    // local_auth has no Linux implementation: availability check throws,
+    // which isAvailable() turns into false. Secure storage still works.
+    final noHardware = FakeBiometricGate(available: false);
+    settings.biometricProtect = true; // also the fresh-install default
+    final c = AuthController(
+        store: store, settings: settings, biometrics: noHardware);
+    controllers.add(c);
+    await c.init();
+    expect(c.biometricProtect, isFalse,
+        reason: 'protection inert without a biometric provider');
+    expect(await c.biometricsAvailable(), isFalse);
+    expect(await c.authenticateForLogin(), isTrue, reason: 'no prompt');
+    expect(noHardware.calls, 0);
+  });
 }

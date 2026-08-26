@@ -65,6 +65,11 @@ class AuthController extends ChangeNotifier {
   /// without a Secret Service). Biometric protection is inert there.
   bool _vaultOk = true;
 
+  /// Set by [init]: whether a biometric provider answered at all. local_auth
+  /// has NO Linux implementation (MissingPluginException) even when secure
+  /// storage works — protection must also be inert in that case.
+  bool _bioAvailable = true;
+
   void _notify() {
     if (!_disposed) notifyListeners();
   }
@@ -73,12 +78,12 @@ class AuthController extends ChangeNotifier {
 
   /// For the streaming proxy.
   String? tokenProvider() => token?.accessToken;
-
   // ------------------------------------------------------------- startup
 
   /// Silent: never asks for biometrics; refresh only when近过期.
   Future<void> init() async {
     _vaultOk = await _store.storageWritable();
+    _bioAvailable = await _biometrics.isAvailable();
     if (_vaultOk) {
       token = await _store.loadToken();
       savedAccount = await _store.loadAccount();
@@ -280,14 +285,14 @@ class AuthController extends ChangeNotifier {
     if (!biometricProtect) return true;
     return _biometrics.authenticate('验证指纹以登录并保存密码');
   }
+  /// Vault switch visibility: needs secure storage AND a biometric
+  /// provider (local_auth has no Linux implementation at all).
+  Future<bool> biometricsAvailable() async => _vaultOk && _bioAvailable;
 
-  /// Vault switch visibility: needs BOTH a biometric provider and working
-  /// secure storage (Linux without a Secret Service has neither usable).
-  Future<bool> biometricsAvailable() async =>
-      _vaultOk && await _biometrics.isAvailable();
-
-  /// Effective protection — inert when secure storage is unavailable.
-  bool get biometricProtect => _settings.biometricProtect && _vaultOk;
+  /// Effective protection — inert when secure storage is unusable OR no
+  /// biometric provider answered (both probed once at init).
+  bool get biometricProtect =>
+      _settings.biometricProtect && _vaultOk && _bioAvailable;
 
   /// Whether secure storage works at all (probed at init).
   bool get vaultAvailable => _vaultOk;
