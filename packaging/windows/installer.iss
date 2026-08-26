@@ -28,6 +28,7 @@ UninstallDisplayIcon={app}\{#AppExeName}
 LicenseFile=..\..\LICENSE
 ; Unofficial translation vendored from
 ; jrsoftware/issrc tag is-6_5_1 (Inno Setup 6.4.0+ messages).
+[Languages]
 Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
