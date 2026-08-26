@@ -11,15 +11,25 @@ import '../../auth/auth_controller.dart';
 import '../../auth/login_service.dart' as svc;
 
 /// Entry point used across the app: shows the centered login dialog.
-Future<void> showLoginCard(BuildContext context) {
+/// [e2eAccount]/[e2ePassword] auto-fill and auto-submit (login-webview
+/// E2E only; the captcha still needs no human for layout inspection).
+Future<void> showLoginCard(BuildContext context,
+    {String? e2eAccount, String? e2ePassword}) {
   return showDialog<void>(
     context: context,
-    builder: (_) => const Dialog(child: LoginCard()),
+    builder: (_) => LoginCard(
+      e2eAccount: e2eAccount,
+      e2ePassword: e2ePassword,
+    ),
   );
 }
 
 class LoginCard extends StatefulWidget {
-  const LoginCard({super.key});
+  const LoginCard({super.key, this.e2eAccount, this.e2ePassword});
+
+  /// E2E-only prefills; when both set the card auto-submits.
+  final String? e2eAccount;
+  final String? e2ePassword;
 
   @override
   State<LoginCard> createState() => _LoginCardState();
@@ -41,9 +51,14 @@ class _LoginCardState extends State<LoginCard> {
         .biometricsAvailable()
         .then((v) => mounted ? setState(() => _biometricsAvailable = v) : null);
   }
-
   Future<void> _prefill() async {
     final auth = context.read<AuthController>();
+    if (widget.e2eAccount != null && widget.e2ePassword != null) {
+      _account.text = widget.e2eAccount!;
+      _password.text = widget.e2ePassword!;
+      unawaited(_start());
+      return;
+    }
     final account = auth.savedAccount;
     if (account == null) return; // first login: nothing saved yet
     _account.text = account;

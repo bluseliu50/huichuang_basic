@@ -55,6 +55,17 @@ String credentialInjection(String account, String password) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
+  // Token push: WebKitGTK exposes the script message handler as
+  // window.<name>; WKWebView as window.webkit.messageHandlers.<name>.
+  function __hcPush(v) {
+    try {
+      var ch = window['$_tokenChannelName'];
+      if (ch && ch.postMessage) { ch.postMessage(v); return; }
+      var wk = window.webkit && window.webkit.messageHandlers;
+      var h = wk && wk['$_tokenChannelName'];
+      if (h && h.postMessage) h.postMessage(v);
+    } catch (e) {}
+  }
   var tries = 0;
   var timer = setInterval(function () {
     tries++;
@@ -64,22 +75,16 @@ String credentialInjection(String account, String password) {
         var existing = localStorage.getItem(KEY);
         if (existing && existing.length > 50) {
           clearInterval(timer);
-          var ch0 = window['$_tokenChannelName'];
-          if (ch0 && ch0.postMessage) ch0.postMessage(existing);
+          __hcPush(existing);
           return;
         }
-        // In-page token push: once the portal drops the token into
-        // localStorage, hand it to the host through the script message
-        // channel. Independent of evaluateJavaScript, whose async
-        // callback never fires on some WebKitGTK builds.
+        // Keep pushing until the portal writes the token after login —
+        // independent of evaluateJavaScript, whose async callback never
+        // fires on some WebKitGTK builds.
         var t2 = setInterval(function () {
           try {
             var v = localStorage.getItem(KEY);
-            if (v && v.length > 50) {
-              clearInterval(t2);
-              var ch = window['$_tokenChannelName'];
-              if (ch && ch.postMessage) ch.postMessage(v);
-            }
+            if (v && v.length > 50) { clearInterval(t2); __hcPush(v); }
           } catch (e) {}
         }, 500);
         var links = Array.prototype.slice.call(document.querySelectorAll('a'))
@@ -213,6 +218,8 @@ class DesktopLoginService implements LoginService {
     // which can hang forever on WebKitGTK builds whose async JS
     // callbacks die mid-login (GLib criticals in WebKitWebProcess).
     webview.registerJavaScriptMessageHandler(_tokenChannelName, (_, body) {
+      debugPrint(
+          'HC_LOGIN token push received (${body is String ? body.length : body})');
       final value = body is String &&
               body.length > 2 &&
               body.startsWith('"') &&
@@ -224,7 +231,9 @@ class DesktopLoginService implements LoginService {
         final token = TokenBundle.fromLocalStorage(value);
         unawaited(WebviewWindow.clearAll());
         done(LoginResult(token: token));
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('HC_LOGIN pushed token failed to parse: $e');
+      }
     });
 
     webview.setOnUrlRequestCallback((url) {

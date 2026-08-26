@@ -1,11 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../store/app_state.dart';
 import 'courses/courses_page.dart';
-import 'player/player_page.dart';
 import 'home/home_page.dart';
+import 'login/login_card.dart';
 import 'pdf/textbooks_page.dart';
+import 'player/player_page.dart';
 import 'search/search_page.dart';
 import 'settings/settings_page.dart';
 
@@ -47,9 +50,21 @@ class _AppShellState extends State<AppShell> {
           );
         });
       }
+      // E2E hook: HC_E2E_LOGIN=account:password auto-opens the login card
+      // and submits, opening the real webview window (captcha pending).
+      final e2eLogin = Platform.environment['HC_E2E_LOGIN'];
+      if (e2eLogin != null) {
+        final parts = e2eLogin.split(':');
+        app.catalogLoadComplete.then((_) async {
+          if (!mounted) return;
+          await showLoginCard(context,
+              e2eAccount: parts.isNotEmpty ? parts[0] : null,
+              e2ePassword:
+                  parts.length > 1 ? parts.sublist(1).join(':') : null);
+        });
+      }
     });
   }
-
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
