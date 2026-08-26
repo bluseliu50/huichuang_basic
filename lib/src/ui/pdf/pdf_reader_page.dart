@@ -66,28 +66,44 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
                 ],
               ),
             )
-          : PdfViewer(
-              PdfDocumentRefUri(
-                widget.url,
-                preferRangeAccess: true,
-              ),
-              controller: _controller,
-              params: PdfViewerParams(
-                onViewerReady: (document, controller) async {
-                  setState(() => _pages = document.pages.length);
-                  final prefs = await SharedPreferences.getInstance();
-                  final saved = prefs.getInt(_key) ?? 1;
-                  if (saved > 1 && saved <= document.pages.length) {
-                    _goToPageSafe(controller, saved);
-                  }
-                },
-                onPageChanged: (pageNumber) {
-                  if (pageNumber != null) {
-                    setState(() => _page = pageNumber);
-                    _savePage(pageNumber);
-                  }
-                },
-              ),            ),
+          : LayoutBuilder(
+              // pdfrx 1.3.5: _updateLayout early-returns on height<=0 leaving
+              // _layout null, but the same builder then dereferences _layout!
+              // (pdf_viewer.dart:453) — one zero-height frame (window minimize
+              // / restore, tiny window) crashes the page. Never hand pdfrx a
+              // zero or non-finite viewport; the rebuild on the next sane
+              // frame remounts the viewer.
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final h = constraints.maxHeight;
+                if (w <= 0 || h <= 0 || !w.isFinite || !h.isFinite) {
+                  return const SizedBox.expand();
+                }
+                return PdfViewer(
+                  PdfDocumentRefUri(
+                    widget.url,
+                    preferRangeAccess: true,
+                  ),
+                  controller: _controller,
+                  params: PdfViewerParams(
+                    onViewerReady: (document, controller) async {
+                      setState(() => _pages = document.pages.length);
+                      final prefs = await SharedPreferences.getInstance();
+                      final saved = prefs.getInt(_key) ?? 1;
+                      if (saved > 1 && saved <= document.pages.length) {
+                        _goToPageSafe(controller, saved);
+                      }
+                    },
+                    onPageChanged: (pageNumber) {
+                      if (pageNumber != null) {
+                        setState(() => _page = pageNumber);
+                        _savePage(pageNumber);
+                      }
+                    },
+                  ),
+                );
+              },
+            ),
       bottomNavigationBar: _pages == 0
           ? null
           : Padding(
