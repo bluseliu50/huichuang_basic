@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'src/api/catalog.dart';
@@ -19,7 +20,14 @@ import 'src/stream/proxy.dart';
 import 'src/store/app_state.dart';
 import 'src/ui/app_shell.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  // desktop_webview_window on Linux draws the webview title bar in a second
+  // Flutter engine whose entrypoint arguments start with 'web_view_title_bar'.
+  // That engine has NO plugins registered — without this guard it boots the
+  // whole app a second time (MissingPluginException storms, a second proxy,
+  // broken method channels) and wrecks the login webview flow.
+  if (runWebViewTitleBarWidget(args)) return;
+
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
@@ -65,18 +73,24 @@ Future<void> main() async {
 
   auth.init(); // silent; never blocks startup
 
-  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-    await windowManager.ensureInitialized();
-    await windowManager.waitUntilReadyToShow(
-      const WindowOptions(
-        title: '惠窗中小学端',
-        minimumSize: Size(960, 640),
-        size: Size(1366, 900),
-      ),
-      () async {
-        await windowManager.show();
-      },
-    );
+  // Never let window setup abort startup: without it the app renders but the
+  // process dies before runApp on hosts where the channel misbehaves.
+  try {
+    if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      await windowManager.ensureInitialized();
+      await windowManager.waitUntilReadyToShow(
+        const WindowOptions(
+          title: '惠窗中小学端',
+          minimumSize: Size(960, 640),
+          size: Size(1366, 900),
+        ),
+        () async {
+          await windowManager.show();
+        },
+      );
+    }
+  } catch (e) {
+    debugPrint('window_manager unavailable, using platform defaults: $e');
   }
   final client = SmarteduClient();
   final supportDir = await getApplicationSupportDirectory();
