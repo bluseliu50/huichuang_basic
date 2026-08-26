@@ -289,61 +289,11 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  /// Playable course packages around the current one: the leaf chapter's
-  /// own packs, or — when the leaf holds a single pack — the whole
-  /// enclosing unit so sibling 课时 stay reachable. Non-package entries
-  /// (吟唱/学习任务单/…) have no playable video and are dropped. Null when
-  /// the open material doesn't match this player's context.
-  (String, List<Lesson>)? _chapterLessons() {
-    final app = _appController;
-    final material = app?.material;
-    if (app == null || material == null) return null;
-    if (material.id != (widget.tmId ?? material.id)) return null;
-    Lesson? current;
-    for (final l in app.lessons) {
-      if (l.id == widget.resId) current = l;
-    }
-    final ids = current?.chapterIds;
-    if (ids == null || ids.isEmpty) return null;
-
-    ChapterNode? find(List<ChapterNode> nodes, String id) {
-      for (final n in nodes) {
-        if (n.id == id) return n;
-        final hit = find(n.children ?? const [], id);
-        if (hit != null) return hit;
-      }
-      return null;
-    }
-
-    List<Lesson> lessonsUnder(ChapterNode n) => [
-          ...app.lessonsFor(n).where((l) => l.isCoursePackage),
-          for (final c in n.children ?? const <ChapterNode>[])
-            ...lessonsUnder(c),
-        ];
-
-    final leaf = find(app.chapters, ids.last);
-    if (leaf == null) return null;
-    var group = leaf;
-    var lessons = lessonsUnder(leaf);
-    if (lessons.length <= 1 && ids.length >= 2) {
-      final parent = find(app.chapters, ids[ids.length - 2]);
-      if (parent != null) {
-        final wider = lessonsUnder(parent);
-        if (wider.length > lessons.length) {
-          group = parent;
-          lessons = wider;
-        }
-      }
-    }
-    return (group.title, lessons);
-  }
-
   Widget _buildSidebar(BuildContext context) {
     final d = _detail;
     if (d == null) return const SizedBox.shrink();
     final periods = d.periods;
     final multi = periods.length >= 2;
-    final chapter = multi ? null : _chapterLessons();
     final flatDocs = d.related.where((r) => !r.isVideo).toList();
 
     return DefaultTabController(
@@ -388,7 +338,8 @@ class _PlayerPageState extends State<PlayerPage> {
           Expanded(
             child: TabBarView(
               children: [
-                // ---- 课时: pack periods, or sibling lessons of the chapter
+                // ---- 课时: the pack's periods, or — for an undivided
+                // course — a single entry named after the course itself
                 multi
                     ? ListView(
                         children: [
@@ -423,27 +374,13 @@ class _PlayerPageState extends State<PlayerPage> {
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.only(
-                                      left: 16, right: 16, bottom: 4),
+                                      left: 16, right: 16, top: 8, bottom: 4),
                                   child: Wrap(
                                     spacing: 6,
                                     runSpacing: 6,
                                     children: [
                                       for (final doc in p.docs)
-                                        ActionChip(
-                                          avatar: Icon(_iconFor(doc.format),
-                                              size: 16,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .primary),
-                                          label: Text(
-                                              doc.typeName ??
-                                                  doc.format ??
-                                                  doc.title,
-                                              style: const TextStyle(
-                                                  fontSize: 12)),
-                                          onPressed: () =>
-                                              _openDoc(context, doc),
-                                        ),
+                                        _docChip(context, doc),
                                     ],
                                   ),
                                 ),
@@ -453,55 +390,44 @@ class _PlayerPageState extends State<PlayerPage> {
                         ],
                       )
                     : ListView(
-                        padding: const EdgeInsets.all(16),
                         children: [
-                          if (chapter != null) ...[
-                            Text('课时选择 · ${chapter.$1}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 4),
-                            for (final l in chapter.$2)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               ListTile(
                                 dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                selected: l.id == widget.resId,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16),
+                                selected: true,
                                 selectedTileColor: Theme.of(context)
                                     .colorScheme
                                     .secondaryContainer,
-                                leading: Icon(
-                                  Icons.play_circle_outline,
-                                  size: 18,
-                                  color: l.id == widget.resId
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.outline,
-                                ),
-                                title: Text(l.title,
+                                leading: Icon(Icons.play_circle_outline,
+                                    size: 20,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary),
+                                title: Text(d.title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13.5)),
-                                onTap: l.id == widget.resId
-                                    ? null
-                                    : () => Navigator.of(context)
-                                        .pushReplacement(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) => PlayerPage(
-                                            resId: l.id,
-                                            title: l.title,
-                                            tmId: widget.tmId ??
-                                                _appController?.material?.id,
-                                          ),
-                                        ),
-                                      ),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w600)),
                               ),
-                          ] else
-                            const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: Text('本课没有多课时'),
-                            ),
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                    left: 16, right: 16, top: 8, bottom: 4),
+                                child: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: [
+                                    for (final doc in flatDocs)
+                                      _docChip(context, doc),
+                                  ],
+                                ),
+                              ),
+                              const Divider(height: 1, indent: 16),
+                            ],
+                          ),
                         ],
                       ),
                 // ---- 附件: every period's resources, divider per period
@@ -535,16 +461,8 @@ class _PlayerPageState extends State<PlayerPage> {
                             runSpacing: 8,
                             children: [
                               for (final doc in p.docs)
-                                ActionChip(
-                                  avatar: Icon(_iconFor(doc.format),
-                                      size: 18,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary),
-                                  label: Text(
-                                      doc.typeName ?? doc.format ?? doc.title),
-                                  onPressed: () => _openDoc(context, doc),
-                                ),
+                                _docChip(context, doc,
+                                    iconSize: 18, fontSize: 14),
                             ],
                           ),
                         ),
@@ -555,15 +473,8 @@ class _PlayerPageState extends State<PlayerPage> {
                         runSpacing: 8,
                         children: [
                           for (final doc in flatDocs)
-                            ActionChip(
-                              avatar: Icon(_iconFor(doc.format),
-                                  size: 18,
-                                  color:
-                                      Theme.of(context).colorScheme.primary),
-                              label:
-                                  Text(doc.typeName ?? doc.format ?? doc.title),
-                              onPressed: () => _openDoc(context, doc),
-                            ),
+                            _docChip(context, doc,
+                                iconSize: 18, fontSize: 14),
                         ],
                       )
                     else
@@ -654,12 +565,7 @@ class _PlayerPageState extends State<PlayerPage> {
             runSpacing: 8,
             children: [
               for (final doc in docs)
-                ActionChip(
-                  avatar: Icon(_iconFor(doc.format),
-                      size: 18, color: Theme.of(context).colorScheme.primary),
-                  label: Text(doc.typeName ?? doc.format ?? doc.title),
-                  onPressed: () => _openDoc(context, doc),
-                ),
+                _docChip(context, doc, iconSize: 18, fontSize: 14),
             ],
           ),
         ],
@@ -673,6 +579,18 @@ class _PlayerPageState extends State<PlayerPage> {
         'doc' || 'docx' => Icons.description_outlined,
         _ => Icons.insert_drive_file_outlined,
       };
+
+  /// Attachment chip for a lesson doc; opens it through [_openDoc].
+  Widget _docChip(BuildContext context, RelatedResource doc,
+      {double iconSize = 16, double fontSize = 12}) {
+    return ActionChip(
+      avatar: Icon(_iconFor(doc.format),
+          size: iconSize, color: Theme.of(context).colorScheme.primary),
+      label: Text(doc.typeName ?? doc.format ?? doc.title,
+          style: TextStyle(fontSize: fontSize)),
+      onPressed: () => _openDoc(context, doc),
+    );
+  }
 
   Future<void> _openDoc(BuildContext context, RelatedResource doc) async {
     if (doc.storages.isEmpty) {
