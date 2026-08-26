@@ -297,34 +297,57 @@ class ResourceDetail {
   }
 
   /// 备课课时 breakdown of the pack; empty when the course is a single
-  /// undivided lesson (fewer than two bkks-tagged videos).
+  /// undivided lesson.
+  ///
+  /// Two shapes on the platform: 旧教材 tags each video with bkks
+  /// (第一课时/第二课时/…); 新教材 packs carry no bkks at all — there the
+  /// n-th video of the pack and the n-th untagged doc of each kind belong
+  /// to the n-th period, named by ordinal.
   List<LessonPeriod> get periods {
-    final videos = <String, RelatedResource>{};
-    for (final r in related) {
-      final name = r.periodName;
-      if (r.isVideo && name != null && !videos.containsKey(name)) {
-        videos[name] = r;
+    final videoList = related.where((r) => r.isVideo).toList();
+    if (videoList.length < 2) return const [];
+
+    final names = <String>[];
+    final byName = <String, RelatedResource>{};
+    for (final v in videoList) {
+      final name = v.periodName;
+      if (name != null && !byName.containsKey(name)) {
+        names.add(name);
+        byName[name] = v;
       }
     }
-    if (videos.length < 2) return const [];
+    // Untagged multi-video pack (新教材): split by video order.
+    if (names.length < 2) {
+      names.clear();
+      byName.clear();
+      const ordinals = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      for (var i = 0; i < videoList.length; i++) {
+        final name = i < ordinals.length
+            ? '第${ordinals[i]}课时'
+            : '第${i + 1}课时';
+        names.add(name);
+        byName[name] = videoList[i];
+      }
+    }
 
     final periods = [
-      for (final e in videos.entries)
-        LessonPeriod(name: e.key, video: e.value, docs: <RelatedResource>[]),
+      for (final n in names)
+        LessonPeriod(name: n, video: byName[n], docs: <RelatedResource>[]),
     ];
-    final byName = {for (final p in periods) p.name: p};
+    final periodsByName = {for (final p in periods) p.name: p};
     final untaggedCount = <String, int>{};
     for (final r in related) {
       if (r.isVideo) continue;
       var name = r.periodName;
-      if (name == null || !byName.containsKey(name)) {
+      if (name == null || !periodsByName.containsKey(name)) {
         // 课件/教学设计 arrive untagged; the n-th of a kind belongs to
         // the n-th period.
         final kind = r.typeName ?? r.title;
         final n = (untaggedCount[kind] = (untaggedCount[kind] ?? 0) + 1);
-        name = periods[n - 1].name;
+        final idx = n - 1 < periods.length ? n - 1 : periods.length - 1;
+        name = periods[idx].name;
       }
-      byName[name]!.docs.add(r);
+      periodsByName[name]!.docs.add(r);
     }
     return periods;
   }

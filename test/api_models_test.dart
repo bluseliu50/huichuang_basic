@@ -116,6 +116,50 @@ void main() {
           expect(p.docs.length, 4);
         }
       });
+      test('splits untagged 新教材 packs by video order', () {
+        // 新教材 carries no bkks tags: 2 videos + 2 of each doc kind,
+        // laid out period by period in relations order.
+        final periods = ResourceDetail.fromJson(
+                fixture('resource_detail_periods_untagged.json'))
+            .periods;
+        expect(periods.map((p) => p.name), ['第一课时', '第二课时']);
+        for (final p in periods) {
+          expect(p.video, isNotNull);
+          expect(p.video!.isVideo, isTrue);
+          // The n-th doc of each kind lands in the n-th period.
+          expect(p.docs.map((r) => r.typeName).toSet(),
+              {'课件', '教学设计', '学习任务单', '课后练习'});
+        }
+      });
+
+      test('extra untagged docs clamp to the last period', () {
+        // 2 videos, 3 课件: the third joins the last period instead of
+        // crashing.
+        final docs = List.generate(
+          3,
+          (i) => RelatedResource(
+            id: 'd$i',
+            title: '课件${i + 1}',
+            format: 'folder',
+            storages: [Uri.parse('https://x/folder$i')],
+            typeName: '课件',
+          ),
+        );
+        final videos = List.generate(
+          2,
+          (i) => RelatedResource(
+            id: 'v$i',
+            title: '视频${i + 1}',
+            format: 'm3u8',
+            storages: [Uri.parse('https://x/v$i.m3u8')],
+          ),
+        );
+        final d = ResourceDetail(id: 'x', title: 'x', related: [...videos, ...docs]);
+        final periods = d.periods;
+        expect(periods, hasLength(2));
+        expect(periods[0].docs, hasLength(1));
+        expect(periods[1].docs, hasLength(2));
+      });
 
       test('single-period packs yield no breakdown', () {
         expect(ResourceDetail.fromJson(fixture('resource_detail.json')).periods,
