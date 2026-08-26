@@ -96,38 +96,57 @@ jobs:
           CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
         run: flutter build windows --release
 
-      - name: Package (macOS)
+      - name: Package (macOS zip with Applications link)
         if: runner.os == 'macOS'
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
           cd build/macos/Build/Products/Release
-          ditto -c -k --sequesterRsrc --keepParent \
-            huichuang_basic.app "huichuang_basic-v${APP_VERSION}-macos-arm64.zip"
+          rm -rf stage && mkdir stage
+          cp -R huichuang_basic.app stage/
+          # Drag-to-install: unzip yields the app next to an Applications
+          # alias; dropping the app onto it copies it into /Applications.
+          ln -s /Applications stage/Applications
+          (cd stage && ditto -c -k --sequesterRsrc huichuang_basic.app Applications \
+            "../huichuang_basic-v${APP_VERSION}-macos-arm64.zip")
 
-      - name: Package (Linux)
+      - name: Package (Linux AppImage)
         if: runner.os == 'Linux'
+        env:
+          # Run AppImage tooling without FUSE (not available on runners).
+          APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
-          # -C bundle from the parent dir: writing the tarball inside the
-          # directory being archived makes tar abort with "file changed as
-          # we read it".
-          cd build/linux/x64/release
-          tar -czf "huichuang_basic-v${APP_VERSION}-linux-x64.tar.gz" -C bundle .
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk-x86_64.AppImage
+          # The flutter bundle is self-contained next to its binary
+          # (RPATH $ORIGIN/lib); place it under usr/bin as the AppDir payload.
+          install -d AppDir/usr/bin
+          cp -r build/linux/x64/release/bundle/. AppDir/usr/bin/
+          OUTPUT="huichuang_basic-v${APP_VERSION}-linux-x64.AppImage" \
+            ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+            --executable AppDir/usr/bin/huichuang_basic \
+            --desktop-file packaging/linux/huichuang_basic.desktop \
+            --icon-file assets/icon.png \
+            --plugin gtk --output appimage
 
-      - name: Package (Windows)
+      - name: Package (Windows installer)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          choco install innosetup --no-progress -y
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           $version = (Select-String '^version:\s*(\S+)' pubspec.yaml |
                       ForEach-Object { $_.Matches[0].Groups[1].Value }) -split '\+' | Select-Object -First 1
-          Compress-Archive -Path build\windows\x64\runner\Release\* `
-            -DestinationPath "huichuang_basic-v${version}-windows-x64.zip"
+          & $iscc "/DAppVersion=$version" packaging\windows\installer.iss
 
-      - name: Locate archives
+      - name: Locate dist files
         id: dist
         shell: bash
         run: |
-          dist=$(find . -name 'huichuang_basic-v*.zip' -o -name 'huichuang_basic-v*.tar.gz' | tr '\n' ' ')
+          dist=$(find . \( -name 'huichuang_basic-v*.zip' \
+            -o -name 'huichuang_basic-v*.AppImage' \
+            -o -name 'huichuang_basic-v*-setup.exe' \) | tr '\n' ' ')
           echo "files=$dist" >> "$GITHUB_OUTPUT"
           ls -l $dist
 
@@ -136,7 +155,8 @@ jobs:
           name: huichuang_basic-${{ matrix.name }}
           path: |
             **/huichuang_basic-v*.zip
-            **/huichuang_basic-v*.tar.gz
+            **/huichuang_basic-v*.AppImage
+            **/huichuang_basic-v*-setup.exe
           if-no-files-found: error
 
       - name: Attach to release

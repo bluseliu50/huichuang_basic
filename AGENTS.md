@@ -95,8 +95,10 @@ publish the release.
   `linux/CMakeLists.txt` and loaded relative to `/proc/self/exe` in
   `linux/runner/my_application.cc`. Keep all three in sync with the icon
   master (`assets/icon.png` is the single source for every platform).
-- Archive names embed the `pubspec.yaml` version — bump `version:` before
-  tagging so release assets are named correctly.
+- Release assets are installers, not raw build trees: Windows Inno Setup
+  `.exe` (`packaging/windows/installer.iss`), Linux AppImage (linuxdeploy +
+  gtk plugin, desktop entry in `packaging/linux/`), macOS zip containing
+  the `.app` beside an `/Applications` symlink for drag-install.
 
 ## Load-bearing decisions (do not revert without equivalent re-verified fixes)
 

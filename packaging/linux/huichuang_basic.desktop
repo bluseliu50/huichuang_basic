@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=惠窗中小学端
+Comment=国家中小学智慧教育平台非官方客户端
+Exec=huichuang_basic
+Icon=huichuang_basic
+Terminal=false
+Categories=Education;Network;
+StartupWMClass=dev.huichuang.huichuang_basic
