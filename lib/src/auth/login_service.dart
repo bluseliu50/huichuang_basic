@@ -21,6 +21,18 @@ const _tokenKey =
 
 const _loginUrl = 'https://basic.smartedu.cn/';
 
+/// WebView2 resolves a relative [CreateConfiguration.userDataFolderWindows]
+/// next to the exe — read-only under Program Files, which makes the login
+/// webview die with "Edge cannot read or write its data directory". Point
+/// it at %APPDATA% instead; other platforms ignore the value.
+String get _webview2DataFolder {
+  final appdata = Platform.environment['APPDATA'];
+  if (Platform.isWindows && appdata != null && appdata.isNotEmpty) {
+    return '$appdata\\huichuang_basic\\webview2';
+  }
+  return 'webview_window_WebView2';
+}
+
 /// JS injected on every page load: on the portal (logged out) clicks the
 /// 登录 entry; on auth.smartedu.cn fills username/password, ticks the
 /// agreement and presses 登录. The slider captcha stays for the human.
@@ -112,14 +124,16 @@ class DesktopLoginService implements LoginService {
     }
     // Fresh webview profile per attempt: a previous account's cookies must
     // never auto-login the next attempt (credential cross-talk).
-    await WebviewWindow.clearAll();
+    await WebviewWindow.clearAll(userDataFolderWindows: _webview2DataFolder);
     final completer = Completer<LoginResult>();
     final webview = await WebviewWindow.create(
-      configuration: const CreateConfiguration(
+      // `const` dropped: the data folder is computed at runtime.
+      configuration: CreateConfiguration(
         title: '登录国家中小学智慧教育平台',
         windowHeight: 720,
         windowWidth: 460,
         titleBarTopPadding: 8,
+        userDataFolderWindows: _webview2DataFolder,
       ),
     );
 
