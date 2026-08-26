@@ -117,6 +117,14 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
                             ],
                           ),
                         ),
+                        // Desktop default: fit one whole page (fitZoom). The
+                        // pdfrx default (coverZoom) fits the page WIDTH, which
+                        // reads oversized on a tall window. Phones keep the
+                        // default — a portrait page fitted to height is tiny.
+                        calculateInitialZoom: _isPhone
+                            ? null
+                            : (document, controller, fitZoom, coverZoom) =>
+                                fitZoom,
                         onViewerReady: (document, controller) async {
                           setState(() => _pages = document.pages.length);
                           final prefs = await SharedPreferences.getInstance();
