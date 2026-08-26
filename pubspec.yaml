@@ -75,6 +75,13 @@ flutter:
 # use-after-free fix (see third_party/desktop_webview_window — linux close
 # destroyed the window object before the destroy handler read its channel).
 # Drop the override once upstream ships the fix.
+#
+# Vendored from pub.dev flutter_inappwebview_android 1.1.3 with the AGP 9
+# proguard fix upstream already has on master (proguard-android.txt →
+# proguard-android-optimize.txt; AGP 9 hard-errors on the legacy file).
+# Drop the override once upstream ships ≥1.1.4/1.2.0.
 dependency_overrides:
   desktop_webview_window:
     path: third_party/desktop_webview_window
+  flutter_inappwebview_android:
+    path: third_party/flutter_inappwebview_android
