@@ -19,6 +19,20 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+// Absolute path of a file shipped next to the executable (data/icon.png),
+// regardless of the current working directory the app was launched from.
+static gchar* bundle_file_path(const gchar* relative) {
+  gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe == nullptr) {
+    return nullptr;
+  }
+  gchar* dir = g_path_get_dirname(exe);
+  g_free(exe);
+  gchar* path = g_build_filename(dir, relative, nullptr);
+  g_free(dir);
+  return path;
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -53,6 +67,13 @@ static void my_application_activate(GApplication* application) {
   }
 
   gtk_window_set_default_size(window, 1280, 720);
+
+  // Window/taskbar icon (data/icon.png installed by the CMake bundle rules).
+  gchar* icon_path = bundle_file_path("data/icon.png");
+  if (icon_path != nullptr) {
+    gtk_window_set_icon_from_file(window, icon_path, nullptr);
+    g_free(icon_path);
+  }
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
