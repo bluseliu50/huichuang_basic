@@ -289,10 +289,11 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  /// Lessons around the current one: the leaf chapter's own lessons, or —
-  /// when the leaf holds a single course — the whole enclosing unit so
-  /// sibling 课时 stay reachable. Null when the open material doesn't match
-  /// this player's context.
+  /// Playable course packages around the current one: the leaf chapter's
+  /// own packs, or — when the leaf holds a single pack — the whole
+  /// enclosing unit so sibling 课时 stay reachable. Non-package entries
+  /// (吟唱/学习任务单/…) have no playable video and are dropped. Null when
+  /// the open material doesn't match this player's context.
   (String, List<Lesson>)? _chapterLessons() {
     final app = _appController;
     final material = app?.material;
@@ -315,7 +316,7 @@ class _PlayerPageState extends State<PlayerPage> {
     }
 
     List<Lesson> lessonsUnder(ChapterNode n) => [
-          ...app.lessonsFor(n),
+          ...app.lessonsFor(n).where((l) => l.isCoursePackage),
           for (final c in n.children ?? const <ChapterNode>[])
             ...lessonsUnder(c),
         ];
@@ -472,9 +473,7 @@ class _PlayerPageState extends State<PlayerPage> {
                                     .colorScheme
                                     .secondaryContainer,
                                 leading: Icon(
-                                  l.isCoursePackage
-                                      ? Icons.play_circle_outline
-                                      : Icons.description_outlined,
+                                  Icons.play_circle_outline,
                                   size: 18,
                                   color: l.id == widget.resId
                                       ? Theme.of(context).colorScheme.primary
