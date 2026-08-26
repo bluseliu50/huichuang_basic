@@ -64,7 +64,8 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libwebkit2gtk-4.1-dev libsoup-3.0-dev libasound2-dev \
-            libmpv-dev libsecret-1-dev libjsoncpp-dev
+            libmpv-dev libsecret-1-dev libjsoncpp-dev \
+            librsvg2-dev libgirepository1.0-dev
 
       - name: Build (macOS, ad-hoc signed)
         if: runner.os == 'macOS'
@@ -105,9 +106,12 @@ jobs:
           cp -R huichuang_basic.app stage/
           # Drag-to-install: unzip yields the app next to an Applications
           # alias; dropping the app onto it copies it into /Applications.
+          # zip -y keeps Applications a symlink instead of recursing into
+          # the real /Applications (ditto cannot archive multiple sources).
           ln -s /Applications stage/Applications
-          (cd stage && ditto -c -k --sequesterRsrc huichuang_basic.app Applications \
-            "../huichuang_basic-v${APP_VERSION}-macos-arm64.zip")
+          (cd stage && zip -qry \
+            "../huichuang_basic-v${APP_VERSION}-macos-arm64.zip" \
+            huichuang_basic.app Applications)
 
       - name: Package (Linux AppImage)
         if: runner.os == 'Linux'
@@ -117,8 +121,12 @@ jobs:
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-gtk/releases/download/continuous/linuxdeploy-plugin-gtk-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk-x86_64.AppImage
+          # The gtk plugin ships as a script on raw master — it has no
+          # release assets. linuxdeploy finds plugins via PATH.
+          wget -q -O linuxdeploy-plugin-gtk.sh \
+            https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
+          export PATH="$PWD:$PATH"
           # The flutter bundle is self-contained next to its binary
           # (RPATH $ORIGIN/lib); place it under usr/bin as the AppDir payload.
           install -d AppDir/usr/bin
@@ -129,7 +137,6 @@ jobs:
             --desktop-file packaging/linux/huichuang_basic.desktop \
             --icon-file assets/icon.png \
             --plugin gtk --output appimage
-
       - name: Package (Windows installer)
         if: runner.os == 'Windows'
         shell: pwsh

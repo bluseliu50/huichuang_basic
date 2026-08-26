@@ -26,9 +26,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#AppExeName}
 ; Non-commercial redistribution only (CC BY-NC-SA 4.0).
 LicenseFile=..\..\LICENSE
-
-[Languages]
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; Unofficial translation vendored from
+; jrsoftware/issrc tag is-6_5_1 (Inno Setup 6.4.0+ messages).
+Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
