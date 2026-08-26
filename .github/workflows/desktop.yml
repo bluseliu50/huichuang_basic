@@ -108,8 +108,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
-          cd build/linux/x64/release/bundle
-          tar -czf "huichuang_basic-v${APP_VERSION}-linux-x64.tar.gz" .
+          # -C bundle from the parent dir: writing the tarball inside the
+          # directory being archived makes tar abort with "file changed as
+          # we read it".
+          cd build/linux/x64/release
+          tar -czf "huichuang_basic-v${APP_VERSION}-linux-x64.tar.gz" -C bundle .
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
