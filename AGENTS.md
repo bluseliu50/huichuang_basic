@@ -72,6 +72,32 @@ macOS E2E log containing `PLAYER_OPEN` and `PLAYER_DURATION <n>s`.
 
 macOS E2E: `HC_E2E_TOKEN='<full token json>' HC_E2E_RESID=<resId> <debug binary>`.
 
+## Continuous integration (desktop)
+
+`.github/workflows/desktop.yml` builds release bundles for macOS (arm64),
+Linux (x64) and Windows (x64) and attaches them to the published release.
+It runs ONLY on:
+
+1. Manual dispatch: Actions → desktop-build → Run workflow.
+2. `release: published`.
+
+Deliberately no push/commit-message triggers — a three-platform build is
+expensive, and commit-message CI ("编译测试" magic strings) invites junk
+pushes just to kick builds. If a build is wanted, press the button or
+publish the release.
+
+- CI holds no certificates, so the macOS job rewrites signing in the
+  checked-out `project.pbxproj` via sed (sdk-scoped identity → `-`,
+  Automatic → Manual, team → empty) and builds ad-hoc. Ad-hoc artifacts
+  run, but Keychain items do not survive a signing-identity change —
+  vault-reliable macOS builds must be signed locally with the real team.
+- Linux window icon: `assets/icon.png` is installed into `data/` by
+  `linux/CMakeLists.txt` and loaded relative to `/proc/self/exe` in
+  `linux/runner/my_application.cc`. Keep all three in sync with the icon
+  master (`assets/icon.png` is the single source for every platform).
+- Archive names embed the `pubspec.yaml` version — bump `version:` before
+  tagging so release assets are named correctly.
+
 ## Load-bearing decisions (do not revert without equivalent re-verified fixes)
 
 - `flutter_secure_storage` **v11** + empty `keychain-access-groups` entitlement

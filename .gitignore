@@ -62,3 +62,8 @@ android/local.properties
 android/key.properties
 **/xcuserdata/
 **/DerivedData/
+# Distributable artifacts (CI builds these; never commit them)
+*.apk
+*.ipa
+*.dmg
+*.app.zip
