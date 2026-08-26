@@ -20,10 +20,16 @@
 
 ## 🔧 从源码构建
 
+项目通过 [fvm](https://fvm.app) 锁定 Flutter 版本（见仓库根 `.fvmrc`，CI 同步读取该文件）：
+
 ```bash
-flutter pub get
-flutter run -d macos      # 或 -d windows / -d linux / android / ios
+brew install fvm            # 或 dart pub global activate fvm
+fvm install                 # 安装 .fvmrc 锁定的 SDK
+fvm flutter pub get
+fvm flutter run -d macos    # 或 -d windows / -d linux / android / ios
 ```
+
+之后所有 `flutter` / `dart` 命令一律加 `fvm` 前缀（如 `fvm flutter test`、`fvm flutter build macos`）。
 
 | 平台 | 构建命令 | 验证状态 |
 |---|---|---|

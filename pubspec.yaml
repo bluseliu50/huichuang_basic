@@ -42,7 +42,7 @@ dependencies:
 
   # UI
   cached_network_image: ^3.4.1
-  pdfrx: ^1.0.110
+  pdfrx: ^2.4.7
 
 dev_dependencies:
   flutter_test:

@@ -17,6 +17,9 @@ account*.txt
 
 # ---- Flutter / Dart ----
 .dart_tool/
+# ---- fvm (Flutter version manager): pin in .fvmrc (committed),
+# ---- local SDK link + caches are machine-specific ----
+.fvm/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
@@ -67,3 +70,6 @@ android/key.properties
 *.ipa
 *.dmg
 *.app.zip
+
+# FVM Version Cache
+.fvm/

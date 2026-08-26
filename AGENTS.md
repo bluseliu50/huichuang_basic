@@ -58,12 +58,16 @@ r1→r2→r3 nodes; media_kit (mpv) plays the proxied URL.
 
 ## Build & test
 
+The project pins its Flutter SDK with **fvm** (`.fvmrc`, committed; CI reads
+the same file). Always run toolchain commands through fvm:
+
 ```bash
-flutter pub get
-flutter analyze            # must report: No issues found
-flutter test               # must be all green
-flutter run -d macos       # daily driver platform
-HC_TOKEN=<access_token> dart run tool/live_check.dart   # live proxy proof
+fvm install                 # once per machine: SDK for the pinned version
+fvm flutter pub get
+fvm flutter analyze         # must report: No issues found
+fvm flutter test            # must be all green
+fvm flutter run -d macos    # daily driver platform
+HC_TOKEN=<access_token> fvm dart run tool/live_check.dart   # live proxy proof
 ```
 
 Verification bar for merging "done" work: `flutter analyze` clean + tests green;

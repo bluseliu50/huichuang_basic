@@ -42,13 +42,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read pinned Flutter version (.fvmrc)
+        id: fv
+        shell: bash
+        # .fvmrc is the single source of truth (fvm pin); keep CI in lockstep.
+        run: |
+          v=$(sed -n 's/.*"flutter"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .fvmrc)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          test -n "$v"
+
       - uses: subosito/flutter-action@v2
         with:
-          # Pin to the version the project is developed and verified with.
-          # Newer stables migrate the Xcode project / add SPM integration in
-          # ways that break this build (pod install no-op → missing Pods
-          # xcfilelists on macOS; pdfrx 1.3.5 fails Dart analysis on Windows).
-          flutter-version: 3.41.6
+          flutter-version: ${{ steps.fv.outputs.version }}
           channel: stable
           cache: true
 
