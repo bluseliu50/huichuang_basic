@@ -131,15 +131,16 @@ jobs:
           # (RPATH $ORIGIN/lib); place it under usr/bin as the AppDir payload.
           install -d AppDir/usr/bin
           cp -r build/linux/x64/release/bundle/. AppDir/usr/bin/
-          # linuxdeploy validates icon resolutions; render the master into
-          # a valid 512x512 instead of passing the 1254x1254 original
-          # (runner image ships ImageMagick 6 — `convert`, not `magick`).
-          convert assets/icon.png -resize 512x512 icon-512.png
+          # linuxdeploy registers icons by FILENAME; it must match the
+          # desktop entry's Icon=huichuang_basic ("icon-512" made it fail
+          # with "could not find suitable icon"). Render the master into a
+          # valid 512x512 (runner image ships ImageMagick 6: `convert`).
+          convert assets/icon.png -resize 512x512 huichuang_basic.png
           OUTPUT="huichuang_basic-v${APP_VERSION}-linux-x64.AppImage" \
             ./linuxdeploy-x86_64.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/huichuang_basic \
             --desktop-file packaging/linux/huichuang_basic.desktop \
-            --icon-file icon-512.png \
+            --icon-file huichuang_basic.png \
             --plugin gtk --output appimage
       - name: Package (Windows installer)
         if: runner.os == 'Windows'
@@ -151,23 +152,28 @@ jobs:
                       ForEach-Object { $_.Matches[0].Groups[1].Value }) -split '\+' | Select-Object -First 1
           & $iscc "/DAppVersion=$version" packaging\windows\installer.iss
 
-      - name: Locate dist files
+      - name: Locate dist file
         id: dist
         shell: bash
         run: |
-          dist=$(find . \( -name 'huichuang_basic-v*.zip' \
+          # Exactly one dist file per job; find it by exact name patterns
+          # without walking matching into the build tree twice.
+          dist=$(find build . -maxdepth 4 \( \
+            -name 'huichuang_basic-v*.zip' \
             -o -name 'huichuang_basic-v*.AppImage' \
-            -o -name 'huichuang_basic-v*-setup.exe' \) | tr '\n' ' ')
+            -o -name 'huichuang_basic-v*-setup.exe' \) -print -quit)
           echo "files=$dist" >> "$GITHUB_OUTPUT"
-          ls -l $dist
+          ls -l "$dist"
 
       - uses: actions/upload-artifact@v4
         with:
           name: huichuang_basic-${{ matrix.name }}
-          path: |
-            **/huichuang_basic-v*.zip
-            **/huichuang_basic-v*.AppImage
-            **/huichuang_basic-v*-setup.exe
+          # Exact path: a ** glob makes the action traverse (and follow
+          # symlinks through) the whole build tree — the macOS job hung
+          # there for the staged .app copy. Archives are already
+          # compressed; skip re-compression on upload.
+          path: ${{ steps.dist.outputs.files }}
+          compression-level: 0
           if-no-files-found: error
 
       - name: Attach to release
