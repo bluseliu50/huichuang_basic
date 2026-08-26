@@ -267,7 +267,10 @@ class AuthController extends ChangeNotifier {
       if (wipeCredentials) await _store.wipeCredentials();
     } catch (_) {}
     await _tokenCache.clear();
-    savedAccount = null;
+    // 仅退出 keeps the vault credentials: savedAccount must survive too,
+    // or the login card loses its prefill (and the biometric password
+    // unlock) for the rest of the session.
+    if (wipeCredentials) savedAccount = null;
     token = null;
     user = null;
     status = AuthStatus.loggedOut;

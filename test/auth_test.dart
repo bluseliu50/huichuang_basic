@@ -174,6 +174,28 @@ void main() {
     expect(await store.loadToken(), isNull);
   });
 
+  test('soft logout keeps credentials for prefill; wipe clears them',
+      () async {
+    final c = controller(
+        performer: (a, p) async => LoginOutcome(_token(), null));
+    expect(await c.login('188', 'pw'), isTrue);
+    expect(c.savedAccount, '188');
+
+    // 仅退出: token gone, vault credentials + savedAccount survive so the
+    // login card can prefill and unlock the password with biometrics.
+    await c.logout();
+    expect(c.status, AuthStatus.loggedOut);
+    expect(c.token, isNull);
+    expect(c.savedAccount, '188');
+    expect(await store.loadPassword(), 'pw');
+
+    // 删除并退出: everything wiped.
+    await c.login('188', 'pw');
+    await c.logout(wipeCredentials: true);
+    expect(c.savedAccount, isNull);
+    expect(await store.loadPassword(), isNull);
+  });
+
   test('failed login surfaces the page-reported failure message', () async {
     final c = controller(
         performer: (a, p) async =>
