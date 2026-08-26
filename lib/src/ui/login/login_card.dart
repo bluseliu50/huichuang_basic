@@ -17,9 +17,14 @@ Future<void> showLoginCard(BuildContext context,
     {String? e2eAccount, String? e2ePassword}) {
   return showDialog<void>(
     context: context,
-    builder: (_) => LoginCard(
-      e2eAccount: e2eAccount,
-      e2ePassword: e2ePassword,
+    // Flutter 3.47's showDialog no longer wraps builder content in a
+    // Material surface (the implicit Dialog is gone); without this Dialog
+    // the TextFields crash with "No Material widget found".
+    builder: (_) => Dialog(
+      child: LoginCard(
+        e2eAccount: e2eAccount,
+        e2ePassword: e2ePassword,
+      ),
     ),
   );
 }
