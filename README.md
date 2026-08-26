@@ -57,7 +57,8 @@ flutter run -d macos      # 或 -d windows / -d linux / android / ios
 ## 🙏 致谢
 
 - [PiliPlus](https://github.com/bilibili/PiliPlus) — 播放器选型（media_kit/mpv）与登录交互模式的先例
-- [tchMaterial-parser](https://github.com/xtwxd/tchMaterial-parser)（MIT）— 电子教材 PDF 端点的发现
+- [tchMaterial-parser](https://github.com/happycola233/tchMaterial-parser)（MIT）— 电子教材
+  `.pkg` 内嵌 PDF 端点、`ebook_mapping` + 目录树接口与多种资源详情端点的发现与整理
 
 ## 📄 许可
 

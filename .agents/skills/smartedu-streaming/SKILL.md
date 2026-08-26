@@ -116,8 +116,20 @@ Dual mirrors: try s-file-1 then s-file-2 on failure.
 - Versions: `zxx/ndrs/resources/tch_material/version/data_version.json`
   (module_version cache busting).
 - Detail: `zxx/ndrv2/resources/tch_material/details/{contentId}.json`
-  → `ti_items[].ti_storages[]` = `r{1,2,3}-ndr-private.../{name}.pdf`
-  (X-ND-AUTH needed; serve through the same proxy, Range passthrough).
+  → `ti_items[]` (pick `ti_is_source_file==true`; `ti_format=="pdf"`,
+  `ti_size` ≈ 10–40 MB scanned textbook). Real file lives INSIDE a `.pkg`
+  container path: `cs_path:${ref-path}/edu_product/esp/assets/{id}.pkg/{ISBN}_{书名}_{ts}.pdf`
+  (expand prefix to `https://r1-ndr-private.ykt.cbern.com.cn`), mirrored on
+  r1/r2/r3. The served bytes are a plain PDF — no decryption needed
+  (verified by tchMaterial-parser, MIT; downloads open in standard viewers).
+- Chapter→page bookmarks (unimplemented here, per tchMaterial-parser):
+  `ti_items[].ti_file_flag=="ebook_mapping"` → `{pkg-base}/ebook_mapping.txt`
+  (JSON: `ebook_id`, `mappings[].{node_id,page_number}`, X-ND-AUTH per URL) +
+  tree `zxx/ndrv2/national_lesson/trees/{ebook_id}.json`.
+- pdfrx gotcha: `PdfDocumentRefUri(url, preferRangeAccess: true)` parses the
+  xref in ~0.5 s but page-object block reads through the local proxy went
+  blank (no error). Full-download default (pdfrx disk cache) renders fine —
+  keep range access OFF for these PDFs.
 - Other content type endpoints (from tchMaterial-parser, MIT):
   quality_course → `/zxx/ndrv2/resources/{id}.json`;
   prepare → `/zxx/ndrv2/prepare_sub_type/resources/details/{id}.json`;
