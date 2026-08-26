@@ -36,7 +36,7 @@ jobs:
           - name: linux-x64
             os: ubuntu-22.04
           - name: windows-x64
-            os: windows-latest
+            os: windows-2022
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -61,7 +61,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang cmake ninja-build pkg-config \
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
-            libwebkit2gtk-4.0-dev libsoup-3.0-dev
+            libwebkit2gtk-4.0-dev libsoup-3.0-dev libasound2-dev
 
       - name: Build (macOS, ad-hoc signed)
         if: runner.os == 'macOS'
@@ -86,6 +86,11 @@ jobs:
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
+        env:
+          # MSVC 14.5x turns the legacy /await + <experimental/coroutine>
+          # pattern (flutter_inappwebview_windows, local_auth_windows) into
+          # a hard STL1011 error; the vendor-documented define silences it.
+          CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
         run: flutter build windows --release
 
       - name: Package (macOS)
