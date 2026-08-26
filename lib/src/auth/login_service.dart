@@ -19,6 +19,10 @@ import '../api/models.dart';
 const _tokenKey =
     'ND_UC_AUTH-e5649925-441d-4a53-b525-51a2f1c4e0a8&ncet-xedu&token';
 
+/// Script-message channel (Linux/macOS) over which the injected page
+/// script pushes the captured token via `window.<name>.postMessage`.
+const _tokenChannelName = 'hcTokenChannel';
+
 const _loginUrl = 'https://basic.smartedu.cn/';
 
 /// WebView2 resolves a relative [CreateConfiguration.userDataFolderWindows]
@@ -57,7 +61,27 @@ String credentialInjection(String account, String password) {
     try {
       var host = location.host;
       if (host === 'basic.smartedu.cn') {
-        if (localStorage.getItem(KEY)) { clearInterval(timer); return; }
+        var existing = localStorage.getItem(KEY);
+        if (existing && existing.length > 50) {
+          clearInterval(timer);
+          var ch0 = window['$_tokenChannelName'];
+          if (ch0 && ch0.postMessage) ch0.postMessage(existing);
+          return;
+        }
+        // In-page token push: once the portal drops the token into
+        // localStorage, hand it to the host through the script message
+        // channel. Independent of evaluateJavaScript, whose async
+        // callback never fires on some WebKitGTK builds.
+        var t2 = setInterval(function () {
+          try {
+            var v = localStorage.getItem(KEY);
+            if (v && v.length > 50) {
+              clearInterval(t2);
+              var ch = window['$_tokenChannelName'];
+              if (ch && ch.postMessage) ch.postMessage(v);
+            }
+          } catch (e) {}
+        }, 500);
         var links = Array.prototype.slice.call(document.querySelectorAll('a'))
           .filter(function (a) { return (a.textContent || '').trim() === '登录'; });
         if (links.length) { clearInterval(timer); links[0].click(); }
@@ -184,6 +208,25 @@ class DesktopLoginService implements LoginService {
       } catch (_) {}
     }
 
+    // Channel push path (Linux/macOS): the injected script posts the
+    // token as soon as the portal writes it — no evaluate round-trip,
+    // which can hang forever on WebKitGTK builds whose async JS
+    // callbacks die mid-login (GLib criticals in WebKitWebProcess).
+    webview.registerJavaScriptMessageHandler(_tokenChannelName, (_, body) {
+      final value = body is String &&
+              body.length > 2 &&
+              body.startsWith('"') &&
+              body.endsWith('"')
+          ? body.substring(1, body.length - 1)
+          : (body is String ? body : null);
+      if (value == null || value.length < 50) return;
+      try {
+        final token = TokenBundle.fromLocalStorage(value);
+        unawaited(WebviewWindow.clearAll());
+        done(LoginResult(token: token));
+      } catch (_) {}
+    });
+
     webview.setOnUrlRequestCallback((url) {
       if (url.contains('basic.smartedu.cn')) {
         onStatus?.call('等待登录完成…');
@@ -200,13 +243,17 @@ class DesktopLoginService implements LoginService {
 
     webview.launch(_loginUrl);
 
-    // Dart-side token poll (works on all desktop backends); every other
-    // tick also probes the auth page for its own error toast so a wrong
-    // password surfaces immediately instead of polling to timeout.
+    // Dart-side token poll — fallback only: the primary capture is the
+    // channel push above. evaluateJavaScript gets a hard timeout because
+    // on some WebKitGTK builds its async callback never fires mid-login
+    // and an unanswered invoke would hang this loop forever.
     for (var i = 0; i < 300 && !finished; i++) {
       await Future<void>.delayed(const Duration(seconds: 1));
+      if (finished) break;
       try {
-        final raw = await webview.evaluateJavaScript(tokenPollExpression());
+        final raw = await webview
+            .evaluateJavaScript(tokenPollExpression())
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
         if (raw != null && raw != 'null' && raw != '""' && raw.length > 50) {
           final value = raw.startsWith('"') && raw.endsWith('"')
               ? raw.substring(1, raw.length - 1)
@@ -224,8 +271,9 @@ class DesktopLoginService implements LoginService {
       }
       if (finished || i.isOdd) continue;
       try {
-        final raw = await webview.evaluateJavaScript(
-            loginFailureProbeExpression());
+        final raw = await webview
+            .evaluateJavaScript(loginFailureProbeExpression())
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
         if (raw is String &&
             raw.length > 2 &&
             raw != 'null' &&
