@@ -19,6 +19,7 @@ import 'src/auth/token_store.dart';
 import 'src/stream/proxy.dart';
 import 'src/store/app_state.dart';
 import 'src/ui/app_shell.dart';
+import 'src/ui/webview_title_bar.dart';
 
 Future<void> main(List<String> args) async {
   // desktop_webview_window on Linux draws the webview title bar in a second
@@ -26,7 +27,7 @@ Future<void> main(List<String> args) async {
   // That engine has NO plugins registered — without this guard it boots the
   // whole app a second time (MissingPluginException storms, a second proxy,
   // broken method channels) and wrecks the login webview flow.
-  if (runWebViewTitleBarWidget(args)) return;
+  if (runWebViewTitleBarWidget(args, builder: hcWebViewTitleBar)) return;
 
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
