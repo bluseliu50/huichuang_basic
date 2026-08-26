@@ -70,3 +70,11 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+
+# Vendored from pub.dev desktop_webview_window 0.3.0 with a Linux close-path
+# use-after-free fix (see third_party/desktop_webview_window — linux close
+# destroyed the window object before the destroy handler read its channel).
+# Drop the override once upstream ships the fix.
+dependency_overrides:
+  desktop_webview_window:
+    path: third_party/desktop_webview_window

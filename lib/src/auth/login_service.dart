@@ -90,17 +90,54 @@ String tokenPollExpression() =>
 String tokenClearExpression() =>
     'localStorage.removeItem("$_tokenKey")';
 
+/// Scans the auth page for the platform's own login-failure wording
+/// (wrong password, locked account, throttling …) so the app can surface
+/// WHY the login failed instead of polling silently for five minutes.
+/// Only ever matches on auth.smartedu.cn — the portal page contains no
+/// these phrases, and captcha prompts deliberately don't match either.
+String loginFailureProbeExpression() => '''
+(function () {
+  if (location.host !== 'auth.smartedu.cn') return '';
+  if (!document.body) return '';
+  var phrases = ['密码错误', '账号或密码', '用户名或密码', '密码不正确',
+                 '账号不存在', '已被锁定', '已被冻结', '登录失败',
+                 '登录异常', '次数过多', '过于频繁'];
+  var lines = (document.body.innerText || '').split('\\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line || line.length > 60) continue;
+    for (var j = 0; j < phrases.length; j++) {
+      if (line.indexOf(phrases[j]) >= 0) return line;
+    }
+  }
+  return '';
+})()
+''';
+
 String _jsEscape(String s) =>
     s.replaceAll('\\', r'\\').replaceAll("'", r"\'").replaceAll('\n', '');
 
 /// Result of a login attempt.
 class LoginResult {
-  const LoginResult({this.token, this.cancelled = false});
+  const LoginResult({this.token, this.cancelled = false, this.failure});
 
   final TokenBundle? token;
   final bool cancelled;
 
+  /// Page-reported failure message (wrong password, lockout …) when the
+  /// webview showed an error instead of logging in.
+  final String? failure;
+
   bool get ok => token != null;
+}
+
+/// What the wired [LoginPerformer] hands back to AuthController: the token
+/// on success, or the failure message to show in the login form.
+class LoginOutcome {
+  const LoginOutcome(this.token, this.failure);
+
+  final TokenBundle? token;
+  final String? failure;
 }
 
 abstract class LoginService {
@@ -163,7 +200,9 @@ class DesktopLoginService implements LoginService {
 
     webview.launch(_loginUrl);
 
-    // Dart-side token poll (works on all desktop backends).
+    // Dart-side token poll (works on all desktop backends); every other
+    // tick also probes the auth page for its own error toast so a wrong
+    // password surfaces immediately instead of polling to timeout.
     for (var i = 0; i < 300 && !finished; i++) {
       await Future<void>.delayed(const Duration(seconds: 1));
       try {
@@ -183,6 +222,20 @@ class DesktopLoginService implements LoginService {
       } catch (_) {
         // Webview not ready yet — keep polling.
       }
+      if (finished || i.isOdd) continue;
+      try {
+        final raw = await webview.evaluateJavaScript(
+            loginFailureProbeExpression());
+        if (raw is String &&
+            raw.length > 2 &&
+            raw != 'null' &&
+            raw != '""') {
+          final msg = raw.startsWith('"') && raw.endsWith('"')
+              ? raw.substring(1, raw.length - 1)
+              : raw;
+          if (msg.isNotEmpty) done(LoginResult(failure: msg));
+        }
+      } catch (_) {}
     }
     done(const LoginResult(cancelled: true));
     return completer.future;

@@ -102,11 +102,17 @@ class _LoginCardState extends State<LoginCard> {
         final ok =
             await auth.login(account, password, rememberPassword: remember);
         if (!mounted) return;
-        Navigator.of(context).pop();
-        if (!ok) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('登录未完成')),
-          );
+        if (ok) {
+          Navigator.of(context).pop();
+        } else {
+          // Keep the dialog open with the page-reported reason so the
+          // user can fix the password in place instead of retyping it.
+          setState(() {
+            _busy = false;
+            _hint = auth.lastLoginFailure != null
+                ? '登录失败：${auth.lastLoginFailure}'
+                : '登录未完成，请重试';
+          });
         }
       } else {
         // Mobile: widget-based webview sheet (shows its own waiting banner).

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:huichuang_basic/src/api/models.dart';
 import 'package:huichuang_basic/src/auth/auth_controller.dart';
 import 'package:huichuang_basic/src/auth/biometric.dart';
+import 'package:huichuang_basic/src/auth/login_service.dart'
+    show LoginOutcome;
 import 'package:huichuang_basic/src/auth/token_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -158,7 +160,7 @@ void main() {
     final c = controller(performer: (account, password) async {
       expect(account, '188');
       expect(password, 'pw');
-      return given;
+      return LoginOutcome(given, null);
     });
     final ok = await c.login('188', 'pw');
     expect(ok, isTrue);
@@ -170,6 +172,20 @@ void main() {
     expect(c.status, AuthStatus.loggedOut);
     expect(await store.loadPassword(), isNull);
     expect(await store.loadToken(), isNull);
+  });
+
+  test('failed login surfaces the page-reported failure message', () async {
+    final c = controller(
+        performer: (a, p) async =>
+            const LoginOutcome(null, '账号或密码错误，请重新输入'));
+    expect(await c.login('188', 'wrong'), isFalse);
+    expect(c.lastLoginFailure, '账号或密码错误，请重新输入');
+
+    // A subsequent success clears the stale failure.
+    final c2 =
+        controller(performer: (a, p) async => LoginOutcome(_token(), null));
+    expect(await c2.login('188', 'pw'), isTrue);
+    expect(c2.lastLoginFailure, isNull);
   });
 
   test('authenticateForLogin gates the login action when protection is on',
@@ -216,7 +232,7 @@ void main() {
         settings: settings,
         biometrics: gate,
         tokenCache: cache,
-        loginPerformer: (a, p) async => _token());
+        loginPerformer: (a, p) async => LoginOutcome(_token(), null));
     controllers.add(c2);
     await c2.init();
     expect(await c2.login('13800000000', 'pw'), isTrue);

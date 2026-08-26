@@ -9,13 +9,14 @@ import 'package:flutter/foundation.dart';
 import '../api/client.dart';
 import '../api/models.dart';
 import 'biometric.dart';
+import 'login_service.dart' show LoginOutcome;
 import 'token_store.dart';
 
 enum AuthStatus { loading, loggedOut, loggedIn, needsRelogin }
 
 /// Performs an interactive webview login. Wired by the app shell
 /// (mobile uses a widget route, desktop a webview window).
-typedef LoginPerformer = Future<TokenBundle?> Function(
+typedef LoginPerformer = Future<LoginOutcome> Function(
     String account, String password);
 
 class AuthController extends ChangeNotifier {
@@ -57,6 +58,11 @@ class AuthController extends ChangeNotifier {
   TokenBundle? token;
   UserInfo? user;
   String? savedAccount;
+
+  /// Page-reported reason of the most recent failed login (wrong
+  /// password, lockout …); null when the last login succeeded or was
+  /// simply cancelled by closing the webview.
+  String? lastLoginFailure;
 
   bool _refreshing = false;
   Timer? _renewTimer;
@@ -195,8 +201,14 @@ class AuthController extends ChangeNotifier {
       {bool rememberPassword = true}) async {
     final performer = _loginPerformer;
     if (performer == null) return false;
-    final t = await performer(account, password);
-    if (t == null) return false;
+    final outcome = await performer(account, password);
+    final t = outcome.token;
+    if (t == null) {
+      lastLoginFailure = outcome.failure;
+      _notify();
+      return false;
+    }
+    lastLoginFailure = null;
     token = t;
     status = AuthStatus.loggedIn;
     await _persist(t, account: account, password: password,
@@ -210,7 +222,6 @@ class AuthController extends ChangeNotifier {
   /// Best-effort persistence: with usable secure storage, secrets go to
   /// the keystore; without one, the login state (never the password)
   /// falls back to the obfuscated file cache so the session survives a
-  /// restart.
   Future<void> _persist(TokenBundle t,
       {String? account, String? password, bool remember = false}) async {
     if (_vaultOk) {

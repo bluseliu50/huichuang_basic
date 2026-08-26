@@ -53,10 +53,10 @@ Future<void> main(List<String> args) async {
       if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
         final r = await DesktopLoginService()
             .login(account: account, password: password);
-        return r.token;
+        return LoginOutcome(r.token, r.failure);
       }
       // Mobile path is widget-based; wired in LoginCard via MobileLoginSheet.
-      return null;
+      return const LoginOutcome(null, null);
     },
   );
   final proxy = StreamProxy(
