@@ -156,9 +156,10 @@ jobs:
         id: dist
         shell: bash
         run: |
-          # Exactly one dist file per job; find it by exact name patterns
-          # without walking matching into the build tree twice.
-          dist=$(find build . -maxdepth 4 \( \
+          # Exactly one dist file per job. The macOS zip sits at depth 6
+          # (build/macos/Build/Products/Release); Windows/Linux land at the
+          # repo root.
+          dist=$(find build . -maxdepth 8 \( \
             -name 'huichuang_basic-v*.zip' \
             -o -name 'huichuang_basic-v*.AppImage' \
             -o -name 'huichuang_basic-v*-setup.exe' \) -print -quit)
