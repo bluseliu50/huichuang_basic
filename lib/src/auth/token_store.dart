@@ -4,7 +4,7 @@
 library;
 
 import 'dart:convert';
-
+import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -100,6 +100,65 @@ class TokenStore {
     } catch (_) {
       return false;
     }
+  }
+}
+
+/// Best-effort token cache for hosts WITHOUT secure storage (Linux
+/// desktops lacking a Secret Service). XOR+base64 obfuscated JSON under
+/// the user config dir — explicitly NOT a secret vault, and the plaintext
+/// password is NEVER written here; only the token bundle plus the account
+/// name for prefill. With a working keystore this cache is not used.
+class TokenFileCache {
+  TokenFileCache([File? file]) : _override = file;
+
+  final File? _override;
+
+  static const _key = 'huichuang-basic-session-v1';
+
+  File? _file() {
+    final o = _override;
+    if (o != null) return o;
+    final env = Platform.environment;
+    final base =
+        env['XDG_CONFIG_HOME'] ?? (env['HOME'] != null ? '${env['HOME']}/.config' : null);
+    if (base == null) return null;
+    return File('$base/huichuang_basic/session.bin');
+  }
+
+  Future<void> save(TokenBundle t, String? account) async {
+    final f = _file();
+    if (f == null) return;
+    final json = jsonEncode({
+      'account': account,
+      'token': t.toUcJson(),
+    });
+    final obfuscated = utf8.encode(json).asMap().entries
+        .map((e) => e.value ^ _key.codeUnitAt(e.key % _key.length))
+        .toList();
+    await f.parent.create(recursive: true);
+    await f.writeAsString(base64Encode(obfuscated), flush: true);
+  }
+
+  Future<(TokenBundle, String?)?> load() async {
+    final f = _file();
+    if (f == null || !await f.exists()) return null;
+    try {
+      final raw = base64Decode(await f.readAsString());
+      final json = utf8.decode(
+          raw.asMap().entries.map((e) => e.value ^ _key.codeUnitAt(e.key % _key.length)).toList());
+      final map = jsonDecode(json) as Map<String, dynamic>;
+      return (
+        TokenBundle.fromUcJson((map['token'] as Map).cast<String, dynamic>()),
+        map['account'] as String?
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clear() async {
+    final f = _file();
+    if (f != null && await f.exists()) await f.delete();
   }
 }
 

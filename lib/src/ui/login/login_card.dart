@@ -70,6 +70,11 @@ class _LoginCardState extends State<LoginCard> {
       _hint = null;
     });
     final auth = context.read<AuthController>();
+    if (!auth.vaultAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('当前系统无法安全保存密码；登录状态将保存到本地缓存')),
+      );
+    }
     // Marriott-style gate: with protection on, the 登录 tap verifies
     // biometrics first; a cancelled prompt aborts. Manual entries still
     // overwrite the saved credentials on success. The auto-login path
@@ -191,21 +196,29 @@ class _LoginCardState extends State<LoginCard> {
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.error)),
             ],
-            if (_biometricsAvailable) ...[
-              const SizedBox(height: 8),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                secondary: const Icon(Icons.fingerprint),
-                title: const Text('生物识别保护'),
-                value: auth.biometricProtect,
-                onChanged: (v) => auth.biometricProtect = v,
-              ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.fingerprint),
+              title: const Text('生物识别保护'),
+              value: auth.biometricProtect,
+              // Visible but grayed when unsupported (hardware or secure
+              // storage missing) — the state must stay discoverable.
+              onChanged: _biometricsAvailable
+                  ? (v) => auth.biometricProtect = v
+                  : null,
+            ),
+            if (!auth.vaultAvailable)
+              Text(
+                '当前系统没有可用的安全存储：密码不会被保存，登录状态将以本地缓存方式保留',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline),
+              )
+            else if (_biometricsAvailable)
               Text(
                 '开启后，登录及读取、保存密码需先验证指纹／面容；启动应用时不会询问。取消验证可手动输入账号密码。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.outline),
               ),
-            ],
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _busy ? null : _start,

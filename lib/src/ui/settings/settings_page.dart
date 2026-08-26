@@ -38,14 +38,22 @@ class _SettingsPageState extends State<SettingsPage> {
         children: [
           _AccountCard(auth: auth),
           const _Section('安全'),
-          if (_biometricsAvailable)
-            SwitchListTile(
-              secondary: const Icon(Icons.fingerprint),
-              title: const Text('生物识别保护凭证'),
-              subtitle: const Text('仅在需要读取已保存密码时要求验证，启动时不询问'),
-              value: auth.biometricProtect,
-              onChanged: (v) => auth.biometricProtect = v,
+          SwitchListTile(
+            secondary: const Icon(Icons.fingerprint),
+            title: const Text('生物识别保护凭证'),
+            subtitle: Text(
+              auth.vaultAvailable
+                  ? '仅在需要读取已保存密码时要求验证，启动时不询问'
+                  : '当前系统没有可用的安全存储，无法保存密码；登录状态将以本地缓存保留',
             ),
+            value: auth.biometricProtect,
+            // Grayed out and forced off when either the biometric
+            // hardware or secure storage is missing — never hidden, so
+            // the state is discoverable.
+            onChanged: _biometricsAvailable
+                ? (v) => auth.biometricProtect = v
+                : null,
+          ),
           const _Section('播放'),
           SwitchListTile(
             secondary: const Icon(Icons.memory_outlined),

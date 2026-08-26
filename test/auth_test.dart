@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:io';
+
 import 'package:huichuang_basic/src/api/models.dart';
 import 'package:huichuang_basic/src/auth/auth_controller.dart';
 import 'package:huichuang_basic/src/auth/biometric.dart';
@@ -190,9 +192,15 @@ void main() {
 
   test('unusable secure storage disables the vault, not the login', () async {
     final broken = TokenStore(ThrowingKV());
+    final cacheFile = File(
+        '${Directory.systemTemp.createTempSync('hc_auth_test').path}/session.bin');
+    final cache = TokenFileCache(cacheFile);
     settings.biometricProtect = true; // also the fresh-install default
     final c = AuthController(
-        store: broken, settings: settings, biometrics: gate);
+        store: broken,
+        settings: settings,
+        biometrics: gate,
+        tokenCache: cache);
     controllers.add(c);
     await c.init();
     expect(c.status, AuthStatus.loggedOut);
@@ -201,16 +209,30 @@ void main() {
     expect(await c.authenticateForLogin(), isTrue, reason: 'no prompt');
     expect(gate.calls, 0, reason: 'biometrics never fire without storage');
 
-    // Login itself still works — session-only, persistence best-effort.
+    // Login works and the SESSION survives a restart via the file cache
+    // (token only — the password is never written there).
     final c2 = AuthController(
         store: broken,
         settings: settings,
         biometrics: gate,
+        tokenCache: cache,
         loginPerformer: (a, p) async => _token());
     controllers.add(c2);
     await c2.init();
     expect(await c2.login('13800000000', 'pw'), isTrue);
     expect(c2.status, AuthStatus.loggedIn);
     expect(c2.token, isNotNull);
+    expect(await cacheFile.exists(), isTrue);
+
+    final c3 = AuthController(
+        store: broken, settings: settings, biometrics: gate, tokenCache: cache);
+    controllers.add(c3);
+    await c3.init();
+    expect(c3.status, AuthStatus.loggedIn, reason: 'token restored from cache');
+    expect(c3.savedAccount, '13800000000');
+    expect(gate.calls, 0, reason: 'still no biometrics at startup');
+
+    await c3.logout();
+    expect(await cacheFile.exists(), isFalse, reason: 'logout clears cache');
   });
 }

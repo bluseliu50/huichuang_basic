@@ -27,14 +27,15 @@ class AuthController extends ChangeNotifier {
     LoginPerformer? loginPerformer,
     DateTime Function()? now,
     Future<TokenBundle?> Function(TokenBundle old)? refresher,
+    TokenFileCache? tokenCache,
   })  : _store = store,
         _settings = settings,
         _biometrics = biometrics ?? SystemBiometricGate(),
         _client = client ?? SmarteduClient(),
         _loginPerformer = loginPerformer,
         _now = now ?? DateTime.now,
-        _refresher = refresher ?? _defaultRefresh;
-
+        _refresher = refresher ?? _defaultRefresh,
+        _tokenCache = tokenCache ?? TokenFileCache();
   final TokenStore _store;
   final AppSettings _settings;
   final BiometricGate _biometrics;
@@ -42,6 +43,7 @@ class AuthController extends ChangeNotifier {
   final LoginPerformer? _loginPerformer;
   final DateTime Function() _now;
   final Future<TokenBundle?> Function(TokenBundle) _refresher;
+  final TokenFileCache _tokenCache;
 
   static Future<TokenBundle?> _defaultRefresh(TokenBundle old) async {
     try {
@@ -77,8 +79,16 @@ class AuthController extends ChangeNotifier {
   /// Silent: never asks for biometrics; refresh only when近过期.
   Future<void> init() async {
     _vaultOk = await _store.storageWritable();
-    token = _vaultOk ? await _store.loadToken() : null;
-    savedAccount = _vaultOk ? await _store.loadAccount() : null;
+    if (_vaultOk) {
+      token = await _store.loadToken();
+      savedAccount = await _store.loadAccount();
+    } else {
+      // No keystore: restore the login state from the obfuscated file
+      // cache (passwords are never cached, only the token + account).
+      final cached = await _tokenCache.load();
+      token = cached?.$1;
+      savedAccount = cached?.$2;
+    }
     if (token == null) {
       status = AuthStatus.loggedOut;
       _notify();
@@ -192,18 +202,29 @@ class AuthController extends ChangeNotifier {
     return true;
   }
 
-  /// Best-effort persistence: on hosts without usable secure storage the
-  /// session stays in memory instead of failing the login.
+  /// Best-effort persistence: with usable secure storage, secrets go to
+  /// the keystore; without one, the login state (never the password)
+  /// falls back to the obfuscated file cache so the session survives a
+  /// restart.
   Future<void> _persist(TokenBundle t,
       {String? account, String? password, bool remember = false}) async {
-    try {
-      await _store.saveToken(t);
-      if (remember && account != null && password != null) {
-        await _store.savePassword(account, password);
-        savedAccount = account;
+    if (_vaultOk) {
+      try {
+        await _store.saveToken(t);
+        if (remember && account != null && password != null) {
+          await _store.savePassword(account, password);
+          savedAccount = account;
+        }
+      } catch (e) {
+        debugPrint('persisting auth state failed: $e');
       }
-    } catch (e) {
-      debugPrint('persisting auth state failed (storage unavailable?): $e');
+    } else {
+      try {
+        await _tokenCache.save(t, account);
+        savedAccount = account;
+      } catch (e) {
+        debugPrint('writing token cache failed: $e');
+      }
     }
   }
 
@@ -225,11 +246,12 @@ class AuthController extends ChangeNotifier {
 
   Future<void> logout({bool wipeCredentials = false}) async {
     _renewTimer?.cancel();
-    await _store.clearToken();
-    if (wipeCredentials) {
-      await _store.wipeCredentials();
-      savedAccount = null;
-    }
+    try {
+      await _store.clearToken();
+      if (wipeCredentials) await _store.wipeCredentials();
+    } catch (_) {}
+    await _tokenCache.clear();
+    savedAccount = null;
     token = null;
     user = null;
     status = AuthStatus.loggedOut;
@@ -266,6 +288,9 @@ class AuthController extends ChangeNotifier {
 
   /// Effective protection — inert when secure storage is unavailable.
   bool get biometricProtect => _settings.biometricProtect && _vaultOk;
+
+  /// Whether secure storage works at all (probed at init).
+  bool get vaultAvailable => _vaultOk;
 
   bool get rememberPasswordDefault => _settings.rememberPassword;
 

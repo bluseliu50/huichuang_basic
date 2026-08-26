@@ -99,6 +99,11 @@ publish the release.
   `.exe` (`packaging/windows/installer.iss`), Linux AppImage (linuxdeploy +
   gtk plugin, desktop entry in `packaging/linux/`), macOS zip containing
   the `.app` beside an `/Applications` symlink for drag-install.
+- Auth on hosts WITHOUT secure storage (Linux without a Secret Service):
+  the token falls back to an XOR-obfuscated file cache
+  (`TokenFileCache`, `~/.config/huichuang_basic/session.bin`) so the login
+  state survives restarts — the plaintext password is NEVER written there;
+  the biometric vault is inert (switch visible but grayed out).
 
 ## Load-bearing decisions (do not revert without equivalent re-verified fixes)
 
