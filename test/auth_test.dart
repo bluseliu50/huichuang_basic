@@ -16,6 +16,17 @@ TokenBundle _token({int? expiresInMs}) {
   );
 }
 
+/// Simulates hosts without a Secret Service: every call throws.
+class ThrowingKV implements SecureKeyValue {
+  @override
+  Future<String?> read(String key) async => throw Exception('no keyring');
+  @override
+  Future<void> write(String key, String value) async =>
+      throw Exception('no keyring');
+  @override
+  Future<void> delete(String key) async => throw Exception('no keyring');
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -175,5 +186,31 @@ void main() {
     gate.shouldPass = true;
     expect(await c.authenticateForLogin(), isTrue);
     expect(gate.calls, 2);
+  });
+
+  test('unusable secure storage disables the vault, not the login', () async {
+    final broken = TokenStore(ThrowingKV());
+    settings.biometricProtect = true; // also the fresh-install default
+    final c = AuthController(
+        store: broken, settings: settings, biometrics: gate);
+    controllers.add(c);
+    await c.init();
+    expect(c.status, AuthStatus.loggedOut);
+    expect(c.biometricProtect, isFalse, reason: 'protection is inert');
+    expect(await c.biometricsAvailable(), isFalse, reason: 'switch hidden');
+    expect(await c.authenticateForLogin(), isTrue, reason: 'no prompt');
+    expect(gate.calls, 0, reason: 'biometrics never fire without storage');
+
+    // Login itself still works — session-only, persistence best-effort.
+    final c2 = AuthController(
+        store: broken,
+        settings: settings,
+        biometrics: gate,
+        loginPerformer: (a, p) async => _token());
+    controllers.add(c2);
+    await c2.init();
+    expect(await c2.login('13800000000', 'pw'), isTrue);
+    expect(c2.status, AuthStatus.loggedIn);
+    expect(c2.token, isNotNull);
   });
 }

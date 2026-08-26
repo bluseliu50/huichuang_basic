@@ -86,6 +86,21 @@ class TokenStore {
     await _kv.delete(_kPassword);
     await _kv.delete(_kAccount);
   }
+
+  /// Round-trip probe: some Linux desktops run without a Secret Service
+  /// (libsecret/keyring), which makes every secure-storage call throw —
+  /// callers must degrade to session-only state there.
+  Future<bool> storageWritable() async {
+    const k = 'hc_storage_probe';
+    try {
+      await _kv.write(k, 'ok');
+      final v = await _kv.read(k);
+      await _kv.delete(k);
+      return v == 'ok';
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 /// Non-secret app settings (biometric toggle etc.).

@@ -59,6 +59,9 @@ class AuthController extends ChangeNotifier {
   bool _refreshing = false;
   Timer? _renewTimer;
   bool _disposed = false;
+  /// Set by [init]: false when secure storage is unusable (Linux desktops
+  /// without a Secret Service). Biometric protection is inert there.
+  bool _vaultOk = true;
 
   void _notify() {
     if (!_disposed) notifyListeners();
@@ -73,8 +76,9 @@ class AuthController extends ChangeNotifier {
 
   /// Silent: never asks for biometrics; refresh only when近过期.
   Future<void> init() async {
-    token = await _store.loadToken();
-    savedAccount = await _store.loadAccount();
+    _vaultOk = await _store.storageWritable();
+    token = _vaultOk ? await _store.loadToken() : null;
+    savedAccount = _vaultOk ? await _store.loadAccount() : null;
     if (token == null) {
       status = AuthStatus.loggedOut;
       _notify();
@@ -114,7 +118,7 @@ class AuthController extends ChangeNotifier {
       final fresh = await _refresher(t);
       if (fresh == null) return false;
       token = fresh;
-      await _store.saveToken(fresh);
+      await _persist(fresh);
       _scheduleRenewal();
       return true;
     } catch (_) {
@@ -180,15 +184,27 @@ class AuthController extends ChangeNotifier {
     if (t == null) return false;
     token = t;
     status = AuthStatus.loggedIn;
-    await _store.saveToken(t);
-    if (rememberPassword && _settings.rememberPassword) {
-      await _store.savePassword(account, password);
-      savedAccount = account;
-    }
+    await _persist(t, account: account, password: password,
+        remember: rememberPassword && _settings.rememberPassword);
     _scheduleRenewal();
     _fetchUser();
     _notify();
     return true;
+  }
+
+  /// Best-effort persistence: on hosts without usable secure storage the
+  /// session stays in memory instead of failing the login.
+  Future<void> _persist(TokenBundle t,
+      {String? account, String? password, bool remember = false}) async {
+    try {
+      await _store.saveToken(t);
+      if (remember && account != null && password != null) {
+        await _store.savePassword(account, password);
+        savedAccount = account;
+      }
+    } catch (e) {
+      debugPrint('persisting auth state failed (storage unavailable?): $e');
+    }
   }
 
   /// Completes a login whose token was captured by the webview UI
@@ -201,11 +217,7 @@ class AuthController extends ChangeNotifier {
   }) async {
     token = t;
     status = AuthStatus.loggedIn;
-    await _store.saveToken(t);
-    if (remember && account != null && password != null) {
-      await _store.savePassword(account, password);
-      savedAccount = account;
-    }
+    await _persist(t, account: account, password: password, remember: remember);
     _scheduleRenewal();
     _fetchUser();
     _notify();
@@ -231,7 +243,7 @@ class AuthController extends ChangeNotifier {
   Future<String?> unlockPassword({bool forcePrompt = false}) async {
     final pw = await _store.loadPassword();
     if (pw == null) return null;
-    if (_settings.biometricProtect || forcePrompt) {
+    if (biometricProtect || forcePrompt) {
       final ok = await _biometrics.authenticate('解锁已保存的登录密码用于自动登录');
       if (!ok) return null;
     }
@@ -243,13 +255,17 @@ class AuthController extends ChangeNotifier {
   /// proof covers saving the credentials afterwards. Reads stay gated by
   /// [unlockPassword]. Returns whether the login may proceed.
   Future<bool> authenticateForLogin() async {
-    if (!_settings.biometricProtect) return true;
+    if (!biometricProtect) return true;
     return _biometrics.authenticate('验证指纹以登录并保存密码');
   }
 
-  Future<bool> biometricsAvailable() => _biometrics.isAvailable();
+  /// Vault switch visibility: needs BOTH a biometric provider and working
+  /// secure storage (Linux without a Secret Service has neither usable).
+  Future<bool> biometricsAvailable() async =>
+      _vaultOk && await _biometrics.isAvailable();
 
-  bool get biometricProtect => _settings.biometricProtect;
+  /// Effective protection — inert when secure storage is unavailable.
+  bool get biometricProtect => _settings.biometricProtect && _vaultOk;
 
   bool get rememberPasswordDefault => _settings.rememberPassword;
 
