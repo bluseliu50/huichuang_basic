@@ -10,7 +10,9 @@
 - **视频播放**：基于 mpv（media_kit）的原生管线播放加密 HLS。本地鉴权代理注入令牌、协商密钥，CDN 节点故障时自动切换——解决官方网页端"视频打不开"的老大难问题
   - 桌面级播放控件：进度/缓冲条、±10s、倍速、音量、全屏、键盘快捷键（空格/K/←→/↑↓/F/M/Esc）、触摸手势（双击全屏、横拖快进、竖拖音量）
   - 断点续播：观看进度自动记录，超过 30s 的课时打开即续播
+  - 多课时课程自动拆分为课时列表：旧教材按 bkks 标签，新教材（无标签）按资源排列顺序推导；课内点击即切换，无需返回目录。单课时课程同样以课时列表呈现（条目即课程本身）
 - **电子教材**：PDF 在线阅读，自动记忆阅读页码，支持滑条跳页
+- **课时文档预览**：课程包内的课件 / 教学设计 / 学习任务单 / 课后练习均为内嵌 PDF，点击即在应用内预览（自动跳过平台的转码目录与白板元数据，直取 PDF 本体），无需下载
 - **本地搜索**：教材 / 课程材料 / 课时三级本地检索（平台远程搜索接口有 WAF 指纹拦截，无法在第三方客户端调用；提供"在浏览器打开官方搜索"兜底）
 - **账号登录**：软件内 WebView 登录官方页面（与 PiliPlus 相同的交互模式），完成滑动验证后自动捕获令牌并滚动续期（约 7 天），无需反复登录
 - **生物识别保险库**（Android / iOS / macOS）：开启后，读取或保存登录密码都需先通过系统生物识别验证；**绝不**在启动时强制验证
@@ -41,6 +43,15 @@ flutter run -d macos      # 或 -d windows / -d linux / android / ios
 - 生物识别需要设备支持（无指纹/Face 的设备自动隐藏该开关）。
 - minSdk 24（Android 7.0）以上。
 
+### 桌面端自动构建（CI）
+
+仓库提供 GitHub Actions 工作流 `desktop-build`，产出三平台 Release 压缩包（macOS arm64 / Linux x64 / Windows x64，文件名含版本号）：
+
+- **手动触发**：仓库页 Actions → desktop-build → Run workflow（产物在本次 run 的 Artifacts 里下载）。
+- **发布 Release 时触发**：压缩包自动挂到该 Release 的 Assets 下。
+- 不会随 push / commit 自动运行——三平台全量构建开销大，按钮即用。
+- 注意：CI 的 macOS 产物为 ad-hoc 签名（可正常打开），但 Keychain 条目不跨签名身份保留；如需凭据保险库长期可靠，请按上文本地签名构建。
+
 ## ⚖️ 法律风险规避（务必阅读）
 
 本项目为**个人学习研究用途**的非官方客户端，与教育部"国家中小学智慧教育平台"及其运营方**无任何关联**。使用前请知悉：
@@ -56,7 +67,7 @@ flutter run -d macos      # 或 -d windows / -d linux / android / ios
 
 ## 🙏 致谢
 
-- [PiliPlus](https://github.com/bilibili/PiliPlus) — 播放器选型（media_kit/mpv）与登录交互模式的先例
+- [PiliPlus](https://github.com/bilibili/PiliPlus) — 播放器选型（media_kit/mpv）与登录交互模式
 - [tchMaterial-parser](https://github.com/happycola233/tchMaterial-parser)（MIT）— 电子教材
   `.pkg` 内嵌 PDF 端点、`ebook_mapping` + 目录树接口与多种资源详情端点的发现与整理
 
