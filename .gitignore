@@ -52,9 +52,9 @@ ios/Runner/GeneratedPluginRegistrant.h
 ios/Runner/GeneratedPluginRegistrant.m
 macos/Flutter/ephemeral
 macos/Flutter/GeneratedPluginRegistrant.swift
-macos/Flutter/Flutter-Debug.xcconfig
-macos/Flutter/Flutter-Release.xcconfig
-macos/Flutter/Flutter-Profile.xcconfig
+# Flutter-{Debug,Release,Profile}.xcconfig are committed templates, NOT
+# generated — ignoring them broke fresh-clone CI builds (the runner configs
+# hard-include them; only ephemeral/ + registrant are tool-generated).
 linux/flutter/ephemeral
 windows/flutter/ephemeral
 android/.gradle/
