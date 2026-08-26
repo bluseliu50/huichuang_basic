@@ -289,6 +289,8 @@ class _ChapterTile extends StatelessWidget {
 
     if (!hasChildren) {
       if (!expandLessons) {
+        // Wide pane: tapping selects the chapter; the lesson pane beside
+        // the tree shows its lessons.
         return Padding(
           padding: EdgeInsets.only(left: 12.0 * depth),
           child: ListTile(
@@ -300,8 +302,8 @@ class _ChapterTile extends StatelessWidget {
           ),
         );
       }
-      // Narrow: no separate lesson pane exists, so the leaf tile must
-      // expose its lessons — otherwise tapping it does nothing at all.
+      // Narrow: every leaf looks the same. One lesson → straight to the
+      // player; several → the chapter's lesson page.
       if (lessons.length == 1) {
         final l = lessons.first;
         return Padding(
@@ -321,28 +323,31 @@ class _ChapterTile extends StatelessWidget {
           ),
         );
       }
-      if (lessons.isEmpty) {
-        return Padding(
-          padding: EdgeInsets.only(left: 12.0 * depth),
-          child: ListTile(
-            dense: true,
-            title: Text(node.title,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-        );
-      }
       return Padding(
-        padding: EdgeInsets.only(left: 8.0 * depth),
-        child: ExpansionTile(
+        padding: EdgeInsets.only(left: 12.0 * depth),
+        child: ListTile(
           dense: true,
-          controlAffinity: ListTileControlAffinity.leading,
           title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text('${lessons.length} 课'),
-          onExpansionChanged: (_) => onSelect(node.id),
-          children: [
-            for (final l in lessons)
-              _LessonRow(lesson: l),
-          ],
+          trailing: lessons.isEmpty
+              ? null
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('${lessons.length} 课',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.outline)),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
+          onTap: lessons.isEmpty
+              ? null
+              : () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => _ChapterLessonsPage(
+                          chapter: node, lessons: lessons),
+                    ),
+                  ),
         ),
       );
     }
@@ -374,6 +379,22 @@ class _ChapterTile extends StatelessWidget {
   }
 }
 
+/// Narrow layout: a chapter's lesson cards on their own page.
+class _ChapterLessonsPage extends StatelessWidget {
+  const _ChapterLessonsPage({required this.chapter, required this.lessons});
+
+  final ChapterNode chapter;
+  final List<Lesson> lessons;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(chapter.title)),
+      body: _LessonPane(chapter: chapter, lessons: lessons),
+    );
+  }
+}
+
 class _LessonRow extends StatelessWidget {
   const _LessonRow({required this.lesson});
 
@@ -388,11 +409,11 @@ class _LessonRow extends StatelessWidget {
         dense: true,
         visualDensity: VisualDensity.compact,
         leading: Icon(
-          lesson.isCoursePackage
+          lesson.isVideoLike
               ? Icons.play_circle_outline
               : Icons.description_outlined,
           size: 18,
-          color: lesson.isCoursePackage
+          color: lesson.isVideoLike
               ? Theme.of(context).colorScheme.primary
               : Theme.of(context).colorScheme.outline,
         ),
@@ -422,7 +443,9 @@ class _LessonPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final coursePkgs = lessons.where((l) => l.isCoursePackage).toList();
+    // All lesson kinds render — 吟唱 (singing) rows are videos too and
+    // open the same player via the singing detail endpoint.
+    final coursePkgs = lessons;
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
@@ -441,7 +464,7 @@ class _LessonPane extends StatelessWidget {
           const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(32),
-              child: Center(child: Text('本章暂无课程包')),
+              child: Center(child: Text('本章暂无课程')),
             ),
           )
         else

@@ -105,6 +105,18 @@ Dual mirrors: try s-file-1 then s-file-2 on failure.
   `chapter_ids` (use `.last` for the leaf chapter).
 - Lessons per material: `zxx/ndrs/national_lesson/teachingmaterials/{tmId}/resources/part_100.json`
 - Related resources: `zxx/ndrs/national_lesson/resources/{resId}/relation_resource.json`
+- **吟唱 (singing) lessons**: the per-material lesson list also contains
+  non-课程包 entries (e.g. 浪淘沙（其七）, `origin_type: 吟唱`) whose
+  `custom_properties.prom_resouce_type` is `assets_video` — they are
+  standalone videos. Their details **403 on the national_lesson path**
+  but are public under a parallel family (verified 2026-08-27, real
+  fixture `test/fixtures/singing_detail.json`):
+  detail `zxx/ndrv2/singing/resources/details/{resId}.json`
+  (root `ti_items[]`: m3u8 mirrors + jpg cover, same r{1,2,3}-ndr-private
+  HLS + key dance as normal lessons); the site plays them at
+  `/syncClassroom/detail?resourceId=…&resourceType=singing`.
+  App: `SmarteduClient.getResourceDetail` falls back to the singing
+  endpoint on failure; `Lesson.isVideoLike` uses prom_resouce_type.
 - Stats API (`x-api.ykt.eduyun.cn/proxy/cloud/v1/res_stats/...`): **abandoned**
   (TENANT param errors, non-essential). Do not use.
 

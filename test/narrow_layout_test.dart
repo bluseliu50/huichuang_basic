@@ -191,7 +191,7 @@ Future<AppController> _app(WidgetTester tester,
 }
 
 void main() {
-  testWidgets('narrow courses: leaf chapter with several lessons expands inline',
+  testWidgets('narrow courses: multi-lesson leaf opens the lesson page',
       (tester) async {
     _narrow(tester);
     final app = await _app(tester,
@@ -202,10 +202,11 @@ void main() {
     // Root chapter is expanded by default; the leaf tiles are visible.
     expect(find.text('第一节 春晓'), findsOneWidget);
 
-    // Tapping a multi-lesson leaf must reveal its lessons inline —
+    // Tapping a multi-lesson leaf pushes the chapter's lesson page —
     // before the fix the tap only flipped a highlight nobody could see.
     await tester.tap(find.text('第一节 春晓'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('春晓第一课'), findsOneWidget);
     expect(find.text('春晓第二课'), findsOneWidget);
   });

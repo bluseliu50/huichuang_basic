@@ -1,0 +1,136 @@
+{
+ "creator": "452315580589",
+ "status": "ONLINE",
+ "create_time": "2025-08-04T18:20:52.651+0800",
+ "online_time": "2025-09-11T14:04:22.078+0800",
+ "update_time": "2026-01-22T02:43:07.646+0800",
+ "custom_properties": {
+  "prom_resouce_type": "assets_video",
+  "ext_properties": {
+   "origin_type": "吟唱"
+  },
+  "copyright_holder_ids": [],
+  "audit_status": "AUDIT_WAITING",
+  "sys_resource_space": 110339734,
+  "resolution": "1920*1080",
+  "height": "1080",
+  "format": "mp4",
+  "faculty_advisor_ids": [],
+  "teacher_ids": [],
+  "origin_type": "吟唱",
+  "thumbnail_audit_status": "AUDIT_WAITING",
+  "size": 9232567,
+  "global_resource_id": "e63094d3-a851-057c-a0d9-58d637a90252",
+  "preview": {
+   "frame1": "https://r2-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/frame1-1920x1080-cover/1.jpg",
+   "transcodeCut_1": "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/1.jpg",
+   "sprite-1": "https://r1-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/sprite/sprite-100-160x90-sprite/1.jpg",
+   "cover": "https://r2-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-160x120-frame_sprite/1.jpg",
+   "transcodeCut_5": "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/5.jpg",
+   "transcodeCut_10": "https://r2-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/10.jpg",
+   "transcodeCut_4": "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/4.jpg",
+   "transcodeCut_11": "https://r1-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/11.jpg",
+   "transcodeCut_3": "https://r1-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/3.jpg",
+   "transcodeCut_12": "https://r2-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/12.jpg",
+   "transcodeCut_2": "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/2.jpg",
+   "transcodeCut_13": "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/13.jpg",
+   "transcodeCut_9": "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/9.jpg",
+   "transcodeCut_14": "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/14.jpg",
+   "transcodeCut_8": "https://r2-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/8.jpg",
+   "transcodeCut_15": "https://r1-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/15.jpg",
+   "transcodeCut_7": "https://r1-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/7.jpg",
+   "transcodeCut_16": "https://r1-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/16.jpg",
+   "transcodeCut_6": "https://r2-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.t/zh-CN/1754303000153/transcode/videos/cover-640x480-frame/6.jpg"
+  },
+  "import_template_name": "20250804新增吟唱资源_1754301187494",
+  "auto_fill_thumb": false,
+  "duration": "PT57S",
+  "bit_rate": "1163609",
+  "sys_trans_status": "TRANSCODED",
+  "producer_ids": [],
+  "producers": [],
+  "width": "1920",
+  "thumbnails": [
+   "https://r3-ndr.ykt.cbern.com.cn/edu_product/esp/singing/e63094d3-a851-057c-a0d9-58d637a90252.pkg/浪淘沙（其七） .jpg"
+  ],
+  "providers": [
+   "cddd3690-2f7b-48cd-b48c-effd66e479e5"
+  ]
+ },
+ "resource_custom_properties": {
+  "version_visible": "RELEASE",
+  "download_policy": 0,
+  "ppt_sort": 5799697,
+  "audit_status": "AUDIT_WAITING",
+  "resource_source": "CREATE",
+  "is_top": 0,
+  "compound_node": "normal",
+  "thumbnail_audit_status": "AUDIT_WAITING"
+ },
+ "title": "浪淘沙（其七）",
+ "description": "",
+ "id": "e63094d3-a851-057c-a0d9-58d637a90252",
+ "resource_type_code": "singing",
+ "resource_type_code_name": "吟唱",
+ "language": "zh-CN",
+ "tag_list": [
+  {
+   "tag_dimension_id": "bklx",
+   "tag_id": "5036342830",
+   "tag_name": "吟唱",
+   "order_num": 17
+  },
+  {
+   "tag_dimension_id": "zxxbb",
+   "tag_id": "44bee8bc-54e6-11ed-9c34-850ba61fa9f4",
+   "tag_name": "统编版",
+   "order_num": 224
+  },
+  {
+   "tag_dimension_id": "zxxcc",
+   "tag_id": "ff8080814371757b014390f883db0453",
+   "tag_name": "上册",
+   "order_num": 238
+  },
+  {
+   "tag_dimension_id": "zxxnj",
+   "tag_id": "e7bbd3ea-0590-11ed-9c79-92fc3b3249d5",
+   "tag_name": "四年级",
+   "order_num": 13
+  },
+  {
+   "tag_dimension_id": "zxxxd",
+   "tag_id": "e7bbb2de-0590-11ed-9c79-92fc3b3249d5",
+   "tag_name": "小学",
+   "order_num": 0
+  },
+  {
+   "tag_dimension_id": "zxxxk",
+   "tag_id": "6a749654-0772-11ed-ac74-092ab92074e6",
+   "tag_name": "语文",
+   "order_num": 0
+  }
+ ],
+ "chapter_ids": [
+  "245437ea-2db4-31f0-a2e3-8bb29382fbf8",
+  "cfccc184-44ba-3376-830e-3828e13ccd43"
+ ],
+ "teachmeterial_ids": [
+  "c86543a9-4b6a-4d79-8353-c805af23273c"
+ ],
+ "chapter_paths": [
+  "245437ea-2db4-31f0-a2e3-8bb29382fbf8/cfccc184-44ba-3376-830e-3828e13ccd43"
+ ],
+ "container_id": "elearning-library_ncet-xedu_c0b62085-2e68-42b8-bda2-2316dd332be0",
+ "create_container_id": "elearning-library_ncet-xedu_c0b62085-2e68-42b8-bda2-2316dd332be0",
+ "provider_list": [
+  {
+   "name": "中华诗词学会诗教委员会",
+   "id": "cddd3690-2f7b-48cd-b48c-effd66e479e5",
+   "type": "provider"
+  }
+ ],
+ "ti_items": [],
+ "version_id": "e63094d3-a851-057c-a0d9-58d637a90252",
+ "tenant_id": "1"
+}

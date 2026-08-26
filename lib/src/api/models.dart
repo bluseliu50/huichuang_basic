@@ -141,6 +141,7 @@ class Lesson {
     required this.tags,
     required this.chapterIds,
     this.isCoursePackage = false,
+    this.promResourceType,
   });
 
   final String id;
@@ -154,6 +155,11 @@ class Lesson {
   /// `bklx` == 课程包 marks the packaged course (video + 课件 + …).
   final bool isCoursePackage;
 
+  /// `custom_properties.prom_resouce_type` from the resource list — e.g.
+  /// `assets_video` for 吟唱 songs that are standalone videos without a
+  /// 课程包 tag.
+  final String? promResourceType;
+
   factory Lesson.fromJson(Map<String, dynamic> j) {
     final tags = TeachingMaterial._tagMap(j, 'tag_name');
     return Lesson(
@@ -164,8 +170,15 @@ class Lesson {
           .map((e) => e as String)
           .toList(growable: false),
       isCoursePackage: tags['bklx'] == '课程包',
+      promResourceType:
+          (j['custom_properties'] as Map?)?['prom_resouce_type'] as String?,
     );
   }
+
+  /// Whether tapping this lesson leads to the video player — a 课程包 or
+  /// any assets_video-type resource (吟唱).
+  bool get isVideoLike =>
+      isCoursePackage || (promResourceType?.contains('video') ?? false);
 
   String? get week => tags['zxxweek'];
 }

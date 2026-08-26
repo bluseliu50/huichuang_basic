@@ -107,8 +107,18 @@ class SmarteduClient {
   }
 
   Future<ResourceDetail> getResourceDetail(String resId) async {
-    final data = await getFileJson(
-        'ndrv2/national_lesson/resources/details/$resId.json');
+    dynamic data;
+    try {
+      data = await getFileJson(
+          'ndrv2/national_lesson/resources/details/$resId.json');
+    } on SmarteduApiException {
+      // Non-course-pack lessons (吟唱 songs like 浪淘沙（其七）) live in a
+      // parallel "singing" endpoint family: the national_lesson path 403s
+      // for them, while their details are public under ndrv2/singing.
+      // Their ti_items sit at the root (m3u8 + cover), which
+      // ResourceDetail.fromJson already parses via fromRootItems.
+      data = await getFileJson('ndrv2/singing/resources/details/$resId.json');
+    }
     return ResourceDetail.fromJson(data as Map<String, dynamic>);
   }
 

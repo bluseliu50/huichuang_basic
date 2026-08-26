@@ -54,6 +54,37 @@ void main() {
       expect(l.isCoursePackage, isTrue);
       expect(l.week, '第一周');
     });
+
+    test('吟唱 lessons are video-like without a 课程包 tag', () {
+      // Real entry: 浪淘沙（其七） in 小学语文统编版四年级上册 — an
+      // assets_video singing resource sitting next to the 课程包 rows.
+      final l = Lesson.fromJson(fixture('lesson_singing.json'));
+      expect(l.title, '浪淘沙（其七）');
+      expect(l.isCoursePackage, isFalse);
+      expect(l.promResourceType, 'assets_video');
+      expect(l.isVideoLike, isTrue);
+    });
+  });
+
+  group('SmarteduClient', () {
+    test('getResourceDetail falls back to the singing endpoint on 403',
+        () async {
+      final requested = <String>[];
+      final client = _SingingFallbackClient(fixture('singing_detail.json'), requested);
+      final d = await client.getResourceDetail('e63094d3');
+      // Tried the national_lesson path first, then the singing family.
+      expect(requested, hasLength(2));
+      expect(requested.first, contains('national_lesson/resources/details'));
+      expect(requested.last, contains('singing/resources/details'));
+      // The singing detail's root ti_items parse into an m3u8 video.
+      expect(d.title, '浪淘沙（其七）');
+      expect(d.video, isNotNull);
+      expect(d.video!.isVideo, isTrue);
+      for (final u in d.video!.storages) {
+        expect(u.host, contains('-ndr-private.ykt.cbern.com.cn'));
+        expect(u.path, endsWith('.m3u8'));
+      }
+    });
   });
 
   group('ResourceDetail', () {
@@ -257,6 +288,23 @@ void main() {
     });
   });
 }
+class _SingingFallbackClient extends SmarteduClient {
+  _SingingFallbackClient(this.singingJson, this.requested);
+
+  final Map<String, dynamic> singingJson;
+  final List<String> requested;
+
+  @override
+  Future<dynamic> getFileJson(String path, {Map<String, String>? query}) async {
+    requested.add(path);
+    if (path.contains('national_lesson/resources/details')) {
+      throw const SmarteduApiException('AccessDenied', statusCode: 403);
+    }
+    if (path.contains('singing/resources/details')) return singingJson;
+    throw SmarteduApiException('unexpected path $path');
+  }
+}
+
 
 class _FakeClient extends SmarteduClient {
   _FakeClient(this.tagTreeJson, this.materialJson, this.calls);
