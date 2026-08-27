@@ -261,4 +261,41 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('测试教材 12'), findsOneWidget);
   });
+
+  testWidgets('filter dialog: dim rows and matches scroll as one',
+      (tester) async {
+    // Short viewport: with tall wrapping dim rows the old layout pinned
+    // the rows and squeezed the matches list (Flexible) to zero height.
+    _narrow(tester, size: const Size(500, 380));
+    final app = await _app(tester, after: (app) async {
+      app.updateSelection(
+          const Selection(stageId: 's1', gradeId: 'g1', subjectId: 'k1'));
+    });
+    await tester.pumpWidget(_host(app, const CoursesPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Exactly one scroll view inside the dialog, and the dim rows live in
+    // it (pre-fix the rows sat above the only scrollable, the matches
+    // ListView).
+    final scroll = find.descendant(
+        of: find.byType(AlertDialog), matching: find.byType(SingleChildScrollView));
+    expect(scroll, findsOneWidget);
+    expect(
+      find.descendant(of: scroll, matching: find.text('学段')),
+      findsOneWidget,
+    );
+
+    // The match list is reachable: scroll the shared view to it and the
+    // tile lands inside the visible screen.
+    await tester.ensureVisible(find.text('一年级语文上册'));
+    await tester.pumpAndSettle();
+    final box = tester.renderObject<RenderBox>(find.text('一年级语文上册'));
+    final top = box.localToGlobal(Offset.zero).dy;
+    expect(top, greaterThan(0));
+    expect(top + box.size.height, lessThan(380));
+  });
 }

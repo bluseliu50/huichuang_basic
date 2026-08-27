@@ -635,23 +635,27 @@ class _TextbookPickerDialogState extends State<_TextbookPickerDialog> {
       contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
       content: SizedBox(
         width: dialogMax > 640 ? 640 : dialogMax,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final (dim, label) in _dims)
-              _DimRow(
-                label: label,
-                options: _optionsFor(tree, sel, dim),
-                selected: _selectedId(sel, dim),
-                onPick: (id) =>
-                    app.updateSelection(_withDim(sel, dim, id)),
-              ),
-            const Divider(height: 24),
-            Flexible(
-              child: _MaterialMatches(sel: sel),
-            ),
-          ],
+        // Dimension rows and the matching-materials list scroll as ONE
+        // view. The old Column pinned the (unbounded, wrapping) dim rows
+        // and squeezed _MaterialMatches via Flexible to zero whenever the
+        // rows were tall — the bottom list became unreachable.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final (dim, label) in _dims)
+                _DimRow(
+                  label: label,
+                  options: _optionsFor(tree, sel, dim),
+                  selected: _selectedId(sel, dim),
+                  onPick: (id) =>
+                      app.updateSelection(_withDim(sel, dim, id)),
+                ),
+              const Divider(height: 24),
+              _MaterialMatches(sel: sel),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -781,8 +785,10 @@ class _MaterialMatches extends StatelessWidget {
             style: TextStyle(color: Theme.of(context).colorScheme.outline)),
       );
     }
-    return ListView(
-      shrinkWrap: true,
+    // Plain column: the dialog's SingleChildScrollView owns scrolling;
+    // a nested ListView would fight it for gestures.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         for (final m in matches)
           ListTile(
