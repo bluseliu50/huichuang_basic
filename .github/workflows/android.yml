@@ -50,11 +50,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # No channel override: the pinned version (e.g. 3.48.0-0.3.pre) is a
-      # beta build; flutter-action infers the channel from the version string.
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ steps.fv.outputs.version }}
+          # The action default is channel: stable, which cannot resolve the
+          # pinned beta version (3.48.0-0.3.pre); opt into beta explicitly.
+          channel: beta
           cache: true
 
       - name: Show toolchain
