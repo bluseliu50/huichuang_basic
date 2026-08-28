@@ -2,7 +2,7 @@ name: huichuang_basic
 description: "惠窗中小学端 — unofficial Flutter client for basic.smartedu.cn (个人学习用途，非商业)."
 publish_to: 'none'
 
-version: 0.1.0+1
+version: 0.1.0-rc.1+1
 
 environment:
   sdk: ^3.11.4
