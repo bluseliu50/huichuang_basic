@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -45,8 +46,8 @@ class _SettingsPageState extends State<SettingsPage> {
               !auth.vaultAvailable
                   ? '当前系统没有可用的安全存储，无法保存密码；登录状态将以本地缓存保留'
                   : _biometricsAvailable
-                      ? '仅在需要读取已保存密码时要求验证，启动时不询问'
-                      : '未检测到指纹／面容等生物识别支持，保护暂不可用',
+                  ? '仅在需要读取已保存密码时要求验证，启动时不询问'
+                  : '未检测到指纹／面容等生物识别支持，保护暂不可用',
             ),
             value: auth.biometricProtect,
             // Grayed out and forced off when either the biometric
@@ -73,7 +74,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : null,
             onTap: _clearing ? null : () => _clearCache(context),
           ),
@@ -83,10 +85,19 @@ class _SettingsPageState extends State<SettingsPage> {
             onTap: () => app.clearHistory(),
           ),
           const _Section('关于'),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('惠窗中小学端'),
-            subtitle: Text('版本 1.0.0 · 非官方第三方客户端 · CC BY-NC-SA 4.0'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('惠窗中小学端'),
+            // Live from the build metadata (pubspec version) — a hardcoded
+            // string drifted from the actual release.
+            subtitle: FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              initialData: null,
+              builder: (context, snap) {
+                final v = snap.data?.version;
+                return Text('版本 ${v ?? '…'} · 非官方第三方客户端 · CC BY-NC-SA 4.0');
+              },
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.gavel_outlined),
@@ -96,8 +107,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             leading: const Icon(Icons.open_in_new),
             title: const Text('项目主页'),
-            subtitle:
-                const Text('github.com/bluseliu50/huichuang_basic'),
+            subtitle: const Text('github.com/bluseliu50/huichuang_basic'),
             onTap: () => launchHome(),
           ),
           const SizedBox(height: 24),
@@ -120,8 +130,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> launchHome() async {
-    await launchUrl(Uri.parse('https://github.com/bluseliu50/huichuang_basic'),
-        mode: LaunchMode.externalApplication);
+    await launchUrl(
+      Uri.parse('https://github.com/bluseliu50/huichuang_basic'),
+      mode: LaunchMode.externalApplication,
+    );
   }
 }
 
@@ -133,8 +145,7 @@ class _AccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final logged =
-        auth.isLoggedIn || auth.status == AuthStatus.needsRelogin;
+    final logged = auth.isLoggedIn || auth.status == AuthStatus.needsRelogin;
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       color: scheme.surfaceContainerLow,
@@ -144,8 +155,10 @@ class _AccountCard extends StatelessWidget {
           children: [
             CircleAvatar(
               backgroundColor: scheme.primaryContainer,
-              child: Icon(Icons.person_outline,
-                  color: scheme.onPrimaryContainer),
+              child: Icon(
+                Icons.person_outline,
+                color: scheme.onPrimaryContainer,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -161,8 +174,7 @@ class _AccountCard extends StatelessWidget {
                   if (logged && auth.token != null)
                     Text(
                       '有效期至 ${_fmtDate(auth.token!.expiresAt)}（自动续期）',
-                      style:
-                          TextStyle(fontSize: 12, color: scheme.outline),
+                      style: TextStyle(fontSize: 12, color: scheme.outline),
                     ),
                 ],
               ),
