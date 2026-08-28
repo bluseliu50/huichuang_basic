@@ -5,6 +5,11 @@ import '../../api/models.dart';
 import '../../store/app_state.dart';
 import '../player/player_page.dart';
 
+/// Uniform typography for every row of the mobile chapter tree — plain
+/// lessons, single-lesson leaves, chapter links and expandable multi-period
+/// rows must read identically or the tree looks broken.
+const _kRowTitleStyle = TextStyle(fontSize: 13.5);
+
 class CoursesPage extends StatelessWidget {
   const CoursesPage({super.key});
 
@@ -31,17 +36,17 @@ class CoursesPage extends StatelessWidget {
       body: app.catalogPhase == LoadPhase.loading
           ? const Center(child: CircularProgressIndicator())
           : app.catalogPhase == LoadPhase.error
-              ? _ErrorView(
-                  message: '目录加载失败，请检查网络后重试',
-                  onRetry: () => app.retryCatalog(),
-                )
-              : Column(
-                  children: [
-                    const _SubjectBar(),
-                    const Divider(height: 1),
-                    const Expanded(child: _BrowserBody()),
-                  ],
-                ),
+          ? _ErrorView(
+              message: '目录加载失败，请检查网络后重试',
+              onRetry: () => app.retryCatalog(),
+            )
+          : Column(
+              children: [
+                const _SubjectBar(),
+                const Divider(height: 1),
+                const Expanded(child: _BrowserBody()),
+              ],
+            ),
     );
   }
 }
@@ -58,13 +63,15 @@ String? _gradeEditionLabel(AppController app) {
         walk(n.children);
       }
     }
+
     walk(tree.roots);
     return hit;
   }
 
-  final parts = [name(app.selection.gradeId), name(app.selection.editionId)]
-      .whereType<String>()
-      .toList();
+  final parts = [
+    name(app.selection.gradeId),
+    name(app.selection.editionId),
+  ].whereType<String>().toList();
   return parts.isEmpty ? null : parts.join(' · ');
 }
 
@@ -101,11 +108,12 @@ class _SubjectBar extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 16, right: 4),
-            child: Text('学科',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: Theme.of(context).colorScheme.outline)),
+            child: Text(
+              '学科',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
           ),
           Expanded(
             child: ListView.separated(
@@ -116,8 +124,10 @@ class _SubjectBar extends StatelessWidget {
               itemBuilder: (context, i) {
                 final (gradeId, s) = subjects[i];
                 return ChoiceChip(
-                  label: Text(s.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  label: Text(
+                    s.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   selected: sel.subjectId == s.id,
                   onSelected: (on) {
                     if (!on) return;
@@ -157,8 +167,11 @@ class _ErrorView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.cloud_off,
-              size: 48, color: Theme.of(context).colorScheme.outline),
+          Icon(
+            Icons.cloud_off,
+            size: 48,
+            color: Theme.of(context).colorScheme.outline,
+          ),
           const SizedBox(height: 12),
           Text(message),
           const SizedBox(height: 16),
@@ -190,8 +203,11 @@ class _BrowserBodyState extends State<_BrowserBody> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.menu_book_outlined,
-                size: 48, color: Theme.of(context).colorScheme.outline),
+            Icon(
+              Icons.menu_book_outlined,
+              size: 48,
+              color: Theme.of(context).colorScheme.outline,
+            ),
             const SizedBox(height: 12),
             const Text('选择教材后这里会显示课程目录'),
             const SizedBox(height: 16),
@@ -204,8 +220,8 @@ class _BrowserBodyState extends State<_BrowserBody> {
       );
     }
 
-    final selected = _findChapter(app.chapters, _selectedChapterId) ??
-        app.chapters.first;
+    final selected =
+        _findChapter(app.chapters, _selectedChapterId) ?? app.chapters.first;
     final selectedLessons = app.lessonsFor(selected);
     final wide = MediaQuery.sizeOf(context).width >= 1000;
 
@@ -242,7 +258,9 @@ class _BrowserBodyState extends State<_BrowserBody> {
           ),
         ),
         const VerticalDivider(width: 1),
-        Expanded(child: _LessonPane(chapter: selected, lessons: selectedLessons)),
+        Expanded(
+          child: _LessonPane(chapter: selected, lessons: selectedLessons),
+        ),
       ],
     );
   }
@@ -296,7 +314,11 @@ class _ChapterTile extends StatelessWidget {
           child: ListTile(
             dense: true,
             selected: selected,
-            title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: Text(
+              node.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             trailing: lessons.isEmpty ? null : Text('${lessons.length}'),
             onTap: () => onSelect(node.id),
           ),
@@ -310,11 +332,19 @@ class _ChapterTile extends StatelessWidget {
           padding: EdgeInsets.only(left: 12.0 * depth),
           child: ListTile(
             dense: true,
+            visualDensity: VisualDensity.compact,
             selected: selected,
-            title: Text(node.title,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-            trailing: Icon(Icons.play_circle_outline,
-                size: 20, color: Theme.of(context).colorScheme.primary),
+            title: Text(
+              node.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _kRowTitleStyle,
+            ),
+            trailing: Icon(
+              Icons.play_circle_outline,
+              size: 18,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => PlayerPage(resId: l.id, title: l.title),
@@ -327,27 +357,36 @@ class _ChapterTile extends StatelessWidget {
         padding: EdgeInsets.only(left: 12.0 * depth),
         child: ListTile(
           dense: true,
-          title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          visualDensity: VisualDensity.compact,
+          title: Text(
+            node.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _kRowTitleStyle,
+          ),
           trailing: lessons.isEmpty
               ? null
               : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${lessons.length} 课',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.outline)),
+                    Text(
+                      '${lessons.length} 课',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
                     const Icon(Icons.chevron_right, size: 18),
                   ],
                 ),
           onTap: lessons.isEmpty
               ? null
               : () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => _ChapterLessonsPage(
-                          chapter: node, lessons: lessons),
-                    ),
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        _ChapterLessonsPage(chapter: node, lessons: lessons),
                   ),
+                ),
         ),
       );
     }
@@ -355,14 +394,34 @@ class _ChapterTile extends StatelessWidget {
       padding: EdgeInsets.only(left: 8.0 * depth),
       child: ExpansionTile(
         initiallyExpanded: depth == 0,
-        dense: dense,
+        // Mobile: expandable multi-period rows must match the plain lesson
+        // rows — the default 16px title, subtitle and standard tile height
+        // made dropdown rows visibly larger than their neighbours. The
+        // period count moves to the trailing slot, mirroring leaf rows.
+        dense: dense || expandLessons,
+        visualDensity: expandLessons ? VisualDensity.compact : null,
         controlAffinity: ListTileControlAffinity.leading,
-        title: Text(node.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: dense || lessons.isEmpty ? null : Text('${lessons.length} 课'),
+        title: Text(
+          node.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: expandLessons ? _kRowTitleStyle : null,
+        ),
+        subtitle: dense || expandLessons || lessons.isEmpty
+            ? null
+            : Text('${lessons.length} 课'),
+        trailing: expandLessons && lessons.isNotEmpty
+            ? Text(
+                '${lessons.length} 课',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              )
+            : null,
         onExpansionChanged: (_) => onSelect(node.id),
         children: [
-          for (final l in lessons)
-            _LessonRow(lesson: l),
+          for (final l in lessons) _LessonRow(lesson: l),
           for (final c in node.children!)
             _ChapterTile(
               node: c,
@@ -417,8 +476,12 @@ class _LessonRow extends StatelessWidget {
               ? Theme.of(context).colorScheme.primary
               : Theme.of(context).colorScheme.outline,
         ),
-        title: Text(lesson.title,
-            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5)),
+        title: Text(
+          lesson.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _kRowTitleStyle,
+        ),
         trailing: entry == null ? null : const Icon(Icons.history, size: 14),
         onTap: () => _open(context),
       ),
@@ -453,10 +516,9 @@ class _LessonPane extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Text(
               chapter.title,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -472,8 +534,7 @@ class _LessonPane extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
             sliver: SliverList.builder(
               itemCount: coursePkgs.length,
-              itemBuilder: (context, i) =>
-                  _LessonCard(lesson: coursePkgs[i]),
+              itemBuilder: (context, i) => _LessonCard(lesson: coursePkgs[i]),
             ),
           ),
       ],
@@ -507,8 +568,10 @@ class _LessonCardState extends State<_LessonCard> {
         child: InkWell(
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) =>
-                  PlayerPage(resId: widget.lesson.id, title: widget.lesson.title),
+              builder: (_) => PlayerPage(
+                resId: widget.lesson.id,
+                title: widget.lesson.title,
+              ),
             ),
           ),
           child: Padding(
@@ -521,11 +584,15 @@ class _LessonCardState extends State<_LessonCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.lesson.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 15)),
+                      Text(
+                        widget.lesson.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         [
@@ -544,9 +611,9 @@ class _LessonCardState extends State<_LessonCard> {
                           child: LinearProgressIndicator(
                             value: progress,
                             minHeight: 3,
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                           ),
                         ),
                       ],
@@ -554,8 +621,11 @@ class _LessonCardState extends State<_LessonCard> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Icon(Icons.play_circle_fill,
-                    color: Theme.of(context).colorScheme.primary, size: 34),
+                Icon(
+                  Icons.play_circle_fill,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 34,
+                ),
               ],
             ),
           ),
@@ -580,8 +650,11 @@ class _Cover extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           color: Theme.of(context).colorScheme.primaryContainer,
         ),
-        child: Icon(Icons.play_arrow_rounded,
-            size: 30, color: Theme.of(context).colorScheme.onPrimaryContainer),
+        child: Icon(
+          Icons.play_arrow_rounded,
+          size: 30,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+        ),
       );
     }
     return ClipRRect(
@@ -649,8 +722,7 @@ class _TextbookPickerDialogState extends State<_TextbookPickerDialog> {
                   label: label,
                   options: _optionsFor(tree, sel, dim),
                   selected: _selectedId(sel, dim),
-                  onPick: (id) =>
-                      app.updateSelection(_withDim(sel, dim, id)),
+                  onPick: (id) => app.updateSelection(_withDim(sel, dim, id)),
                 ),
               const Divider(height: 24),
               _MaterialMatches(sel: sel),
@@ -668,38 +740,44 @@ class _TextbookPickerDialogState extends State<_TextbookPickerDialog> {
   }
 
   String? _selectedId(Selection sel, String dim) => switch (dim) {
-        'zxxxd' => sel.stageId,
-        'zxxnj' => sel.gradeId,
-        'zxxxk' => sel.subjectId,
-        'zxxbb' => sel.editionId,
-        'zxxcc' => sel.volumeId,
-        _ => sel.oldNewId,
-      };
+    'zxxxd' => sel.stageId,
+    'zxxnj' => sel.gradeId,
+    'zxxxk' => sel.subjectId,
+    'zxxbb' => sel.editionId,
+    'zxxcc' => sel.volumeId,
+    _ => sel.oldNewId,
+  };
 
   Selection _withDim(Selection sel, String dim, String? id) => switch (dim) {
-        'zxxxd' => sel.copyWith(
-            stageId: id ?? sel.stageId,
-            clearGrade: true,
-            clearSubject: true,
-            clearEdition: true,
-            clearVolume: true,
-            clearOldNew: true),
-        'zxxnj' => sel.copyWith(
-            gradeId: id,
-            clearSubject: true,
-            clearEdition: true,
-            clearVolume: true,
-            clearOldNew: true),
-        'zxxxk' => sel.copyWith(
-            subjectId: id,
-            clearEdition: true,
-            clearVolume: true,
-            clearOldNew: true),
-        'zxxbb' =>
-          sel.copyWith(editionId: id, clearVolume: true, clearOldNew: true),
-        'zxxcc' => sel.copyWith(volumeId: id, clearOldNew: true),
-        _ => sel.copyWith(oldNewId: id),
-      };
+    'zxxxd' => sel.copyWith(
+      stageId: id ?? sel.stageId,
+      clearGrade: true,
+      clearSubject: true,
+      clearEdition: true,
+      clearVolume: true,
+      clearOldNew: true,
+    ),
+    'zxxnj' => sel.copyWith(
+      gradeId: id,
+      clearSubject: true,
+      clearEdition: true,
+      clearVolume: true,
+      clearOldNew: true,
+    ),
+    'zxxxk' => sel.copyWith(
+      subjectId: id,
+      clearEdition: true,
+      clearVolume: true,
+      clearOldNew: true,
+    ),
+    'zxxbb' => sel.copyWith(
+      editionId: id,
+      clearVolume: true,
+      clearOldNew: true,
+    ),
+    'zxxcc' => sel.copyWith(volumeId: id, clearOldNew: true),
+    _ => sel.copyWith(oldNewId: id),
+  };
 
   List<TagNode> _optionsFor(TagTree tree, Selection sel, String dim) {
     List<TagNode> level = tree.roots;
@@ -739,9 +817,12 @@ class _DimRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.outline)),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
@@ -781,8 +862,10 @@ class _MaterialMatches extends StatelessWidget {
     if (matches.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
-        child: Text('没有匹配的教材，请调整筛选',
-            style: TextStyle(color: Theme.of(context).colorScheme.outline)),
+        child: Text(
+          '没有匹配的教材，请调整筛选',
+          style: TextStyle(color: Theme.of(context).colorScheme.outline),
+        ),
       );
     }
     // Plain column: the dialog's SingleChildScrollView owns scrolling;
@@ -794,13 +877,13 @@ class _MaterialMatches extends StatelessWidget {
           ListTile(
             dense: true,
             selected: app.material?.id == m.id,
-            title: Text(m.title,
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: Text(m.title, maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text(
-              [m.tags['zxxbb'], m.tags['zxxcc'], m.tags['zxxxjjc']]
-                  .whereType<String>()
-                  .where((s) => s.isNotEmpty)
-                  .join(' · '),
+              [
+                m.tags['zxxbb'],
+                m.tags['zxxcc'],
+                m.tags['zxxxjjc'],
+              ].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
               maxLines: 1,
             ),
             onTap: () {

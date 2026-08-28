@@ -81,8 +81,9 @@ class _PlayerPageState extends State<PlayerPage> {
       final periods = detail.periods;
       LessonPeriod? period;
       if (periods.isNotEmpty) {
-        final remembered = (await SharedPreferences.getInstance())
-            .getString('hc_lesson_period_${widget.resId}');
+        final remembered = (await SharedPreferences.getInstance()).getString(
+          'hc_lesson_period_${widget.resId}',
+        );
         period = periods.firstWhere(
           (p) => p.name == remembered,
           orElse: () => periods.first,
@@ -97,14 +98,15 @@ class _PlayerPageState extends State<PlayerPage> {
       final proxy = proxy_;
 
       final entry = appController.watchEntryOf(widget.resId);
-      _resumeAt = entry != null && entry.positionSec > 30 && entry.durationSec <= 0
+      _resumeAt =
+          entry != null && entry.positionSec > 30 && entry.durationSec <= 0
           ? null
-          : (entry != null && entry.positionSec > 30 ? entry.positionSec : null);
+          : (entry != null && entry.positionSec > 30
+                ? entry.positionSec
+                : null);
 
       final player = Player(
-        configuration: const PlayerConfiguration(
-          bufferSize: 32 * 1024 * 1024,
-        ),
+        configuration: const PlayerConfiguration(bufferSize: 32 * 1024 * 1024),
       );
       final native = player.platform;
       if (native is NativePlayer) {
@@ -169,8 +171,12 @@ class _PlayerPageState extends State<PlayerPage> {
       _recorded = false;
       _lastRecorded = Duration.zero;
     });
-    unawaited((await SharedPreferences.getInstance())
-        .setString('hc_lesson_period_${widget.resId}', p.name));
+    unawaited(
+      (await SharedPreferences.getInstance()).setString(
+        'hc_lesson_period_${widget.resId}',
+        p.name,
+      ),
+    );
     await player.open(Media(proxy.playlistUrl(widget.resId).toString()));
   }
 
@@ -183,15 +189,15 @@ class _PlayerPageState extends State<PlayerPage> {
     if (!_recorded && pos == Duration.zero) return;
     _recorded = true;
     await _appController?.recordWatch(
-          resId: widget.resId,
-          title: _period == null
-              ? (_detail?.title ?? widget.title)
-              : '${_detail?.title ?? widget.title} · ${_period!.name}',
-          tmId: widget.tmId ?? _appController?.material?.id ?? '',
-          positionSec: pos.inMilliseconds / 1000,
-          durationSec: dur.inMilliseconds / 1000,
-          coverUrl: _appController?.coverUrlOf(widget.resId)?.toString(),
-        );
+      resId: widget.resId,
+      title: _period == null
+          ? (_detail?.title ?? widget.title)
+          : '${_detail?.title ?? widget.title} · ${_period!.name}',
+      tmId: widget.tmId ?? _appController?.material?.id ?? '',
+      positionSec: pos.inMilliseconds / 1000,
+      durationSec: dur.inMilliseconds / 1000,
+      coverUrl: _appController?.coverUrlOf(widget.resId)?.toString(),
+    );
   }
 
   @override
@@ -210,47 +216,45 @@ class _PlayerPageState extends State<PlayerPage> {
     final body = _loading
         ? const Center(child: CircularProgressIndicator())
         : _error != null
-            ? _ErrorCard(
-                message: _error!,
-                onRetry: () {
-                  setState(() {
-                    _error = null;
-                    _loading = true;
-                  });
-                  _player?.dispose();
-                  _player = null;
-                  _load();
-                },
-              )
-            : wide
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Video as large as possible, docked left.
-                      Expanded(child: _buildVideoMax(context)),
-                      SizedBox(
-                        width: 360,
-                        child: _buildSidebar(context),
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: _buildVideo(context),
-                      ),
-                      Expanded(
-                        flex: 4,
-                        child: _buildBelow(context),
-                      ),
-                    ],
-                  );
+        ? _ErrorCard(
+            message: _error!,
+            onRetry: () {
+              setState(() {
+                _error = null;
+                _loading = true;
+              });
+              _player?.dispose();
+              _player = null;
+              _load();
+            },
+          )
+        : wide
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Video as large as possible, docked left.
+              Expanded(child: _buildVideoMax(context)),
+              SizedBox(width: 360, child: _buildSidebar(context)),
+            ],
+          )
+        : Column(
+            // Portrait: the video takes its natural 16:9 height from
+            // the screen width; a fixed flex split left huge black
+            // bands inside the video area and squeezed the info
+            // section (title/resources) into the bottom quarter.
+            children: [
+              _buildVideo(context),
+              Expanded(child: _buildBelow(context)),
+            ],
+          );
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_detail?.title ?? widget.title,
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          _detail?.title ?? widget.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: body,
     );
@@ -264,10 +268,8 @@ class _PlayerPageState extends State<PlayerPage> {
         aspectRatio: 16 / 9,
         child: Video(
           controller: c,
-          controls: (state) => _HuichuangControls(
-            state: state,
-            isDesktop: _isDesktop,
-          ),
+          controls: (state) =>
+              _HuichuangControls(state: state, isDesktop: _isDesktop),
         ),
       ),
     );
@@ -281,10 +283,8 @@ class _PlayerPageState extends State<PlayerPage> {
       color: Colors.black,
       child: Video(
         controller: c,
-        controls: (state) => _HuichuangControls(
-          state: state,
-          isDesktop: _isDesktop,
-        ),
+        controls: (state) =>
+            _HuichuangControls(state: state, isDesktop: _isDesktop),
       ),
     );
   }
@@ -312,8 +312,8 @@ class _PlayerPageState extends State<PlayerPage> {
                     child: Text(
                       '已从上次位置继续（${_resumeAt!.round()} 秒处）',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ),
                 Text(d.title, style: Theme.of(context).textTheme.titleMedium),
@@ -324,8 +324,8 @@ class _PlayerPageState extends State<PlayerPage> {
                     if (d.provider != null) d.provider!,
                   ].join(' · '),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
                 ),
               ],
             ),
@@ -333,7 +333,10 @@ class _PlayerPageState extends State<PlayerPage> {
           const TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            tabs: [Tab(text: '课时'), Tab(text: '附件')],
+            tabs: [
+              Tab(text: '课时'),
+              Tab(text: '附件'),
+            ],
           ),
           Expanded(
             child: TabBarView(
@@ -349,32 +352,37 @@ class _PlayerPageState extends State<PlayerPage> {
                               children: [
                                 ListTile(
                                   dense: true,
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(
-                                          horizontal: 16),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
                                   selected: _period?.name == p.name,
-                                  selectedTileColor: Theme.of(context)
-                                      .colorScheme
-                                      .secondaryContainer,
-                                  leading: Icon(Icons.play_circle_outline,
-                                      size: 20,
-                                      color: _period?.name == p.name
-                                          ? Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .outline),
-                                  title: Text(p.name,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w600)),
+                                  selectedTileColor: Theme.of(
+                                    context,
+                                  ).colorScheme.secondaryContainer,
+                                  leading: Icon(
+                                    Icons.play_circle_outline,
+                                    size: 20,
+                                    color: _period?.name == p.name
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.outline,
+                                  ),
+                                  title: Text(
+                                    p.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   onTap: _period?.name == p.name
                                       ? null
                                       : () => _switchPeriod(p),
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.only(
-                                      left: 16, right: 16, top: 8, bottom: 4),
+                                    left: 16,
+                                    right: 16,
+                                    top: 8,
+                                    bottom: 4,
+                                  ),
                                   child: Wrap(
                                     spacing: 6,
                                     runSpacing: 6,
@@ -397,25 +405,33 @@ class _PlayerPageState extends State<PlayerPage> {
                               ListTile(
                                 dense: true,
                                 contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16),
+                                  horizontal: 16,
+                                ),
                                 selected: true,
-                                selectedTileColor: Theme.of(context)
-                                    .colorScheme
-                                    .secondaryContainer,
-                                leading: Icon(Icons.play_circle_outline,
-                                    size: 20,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary),
-                                title: Text(d.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600)),
+                                selectedTileColor: Theme.of(
+                                  context,
+                                ).colorScheme.secondaryContainer,
+                                leading: Icon(
+                                  Icons.play_circle_outline,
+                                  size: 20,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                title: Text(
+                                  d.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                               Padding(
                                 padding: const EdgeInsets.only(
-                                    left: 16, right: 16, top: 8, bottom: 4),
+                                  left: 16,
+                                  right: 16,
+                                  top: 8,
+                                  bottom: 4,
+                                ),
                                 child: Wrap(
                                   spacing: 6,
                                   runSpacing: 6,
@@ -440,16 +456,18 @@ class _PlayerPageState extends State<PlayerPage> {
                           children: [
                             const Expanded(child: Divider()),
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text(p.name,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .labelMedium
-                                      ?.copyWith(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .outline)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Text(
+                                p.name,
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
+                                    ),
+                              ),
                             ),
                             const Expanded(child: Divider()),
                           ],
@@ -461,8 +479,12 @@ class _PlayerPageState extends State<PlayerPage> {
                             runSpacing: 8,
                             children: [
                               for (final doc in p.docs)
-                                _docChip(context, doc,
-                                    iconSize: 18, fontSize: 14),
+                                _docChip(
+                                  context,
+                                  doc,
+                                  iconSize: 18,
+                                  fontSize: 14,
+                                ),
                             ],
                           ),
                         ),
@@ -473,8 +495,7 @@ class _PlayerPageState extends State<PlayerPage> {
                         runSpacing: 8,
                         children: [
                           for (final doc in flatDocs)
-                            _docChip(context, doc,
-                                iconSize: 18, fontSize: 14),
+                            _docChip(context, doc, iconSize: 18, fontSize: 14),
                         ],
                       )
                     else
@@ -510,8 +531,8 @@ class _PlayerPageState extends State<PlayerPage> {
             child: Text(
               '已从上次位置继续（${_resumeAt!.round()} 秒处）',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         Row(
@@ -520,8 +541,7 @@ class _PlayerPageState extends State<PlayerPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(d.title,
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Text(d.title, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(
                     [
@@ -529,8 +549,8 @@ class _PlayerPageState extends State<PlayerPage> {
                       if (d.provider != null) d.provider!,
                     ].join(' · '),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                   ),
                 ],
               ),
@@ -554,11 +574,12 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
         if (docs.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('课时资源',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
+          Text(
+            '课时资源',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -574,29 +595,38 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   IconData _iconFor(String? format) => switch (format) {
-        'pdf' => Icons.picture_as_pdf_outlined,
-        'ppt' || 'pptx' => Icons.slideshow_outlined,
-        'doc' || 'docx' => Icons.description_outlined,
-        _ => Icons.insert_drive_file_outlined,
-      };
+    'pdf' => Icons.picture_as_pdf_outlined,
+    'ppt' || 'pptx' => Icons.slideshow_outlined,
+    'doc' || 'docx' => Icons.description_outlined,
+    _ => Icons.insert_drive_file_outlined,
+  };
 
   /// Attachment chip for a lesson doc; opens it through [_openDoc].
-  Widget _docChip(BuildContext context, RelatedResource doc,
-      {double iconSize = 16, double fontSize = 12}) {
+  Widget _docChip(
+    BuildContext context,
+    RelatedResource doc, {
+    double iconSize = 16,
+    double fontSize = 12,
+  }) {
     return ActionChip(
-      avatar: Icon(_iconFor(doc.format),
-          size: iconSize, color: Theme.of(context).colorScheme.primary),
-      label: Text(doc.typeName ?? doc.format ?? doc.title,
-          style: TextStyle(fontSize: fontSize)),
+      avatar: Icon(
+        _iconFor(doc.format),
+        size: iconSize,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      label: Text(
+        doc.typeName ?? doc.format ?? doc.title,
+        style: TextStyle(fontSize: fontSize),
+      ),
       onPressed: () => _openDoc(context, doc),
     );
   }
 
   Future<void> _openDoc(BuildContext context, RelatedResource doc) async {
     if (doc.storages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('该资源没有可用文件')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('该资源没有可用文件')));
       return;
     }
     final proxy = context.read<StreamProxy>();
@@ -610,18 +640,16 @@ class _PlayerPageState extends State<PlayerPage> {
       return;
     }
     // Non-PDF: download through the proxy and hand to the system.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('正在下载 ${doc.title} …')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('正在下载 ${doc.title} …')));
     try {
       final client = HttpClient();
       final req = await client.getUrl(url);
       final res = await req.close();
       final name =
           '${doc.title}.${(doc.format ?? 'bin').replaceAll(RegExp(r'[^a-z0-9]'), '')}';
-      final dir = _isDesktop
-          ? Directory.systemTemp
-          : await _mobileDownloads();
+      final dir = _isDesktop ? Directory.systemTemp : await _mobileDownloads();
       final file = File('${dir.path}/$name');
       final sink = file.openWrite();
       await for (final chunk in res) {
@@ -632,22 +660,24 @@ class _PlayerPageState extends State<PlayerPage> {
         final opener = Platform.isMacOS
             ? 'open'
             : Platform.isLinux
-                ? 'xdg-open'
-                : 'cmd';
-        final args = Platform.isWindows ? ['/c', 'start', '', file.path] : [file.path];
+            ? 'xdg-open'
+            : 'cmd';
+        final args = Platform.isWindows
+            ? ['/c', 'start', '', file.path]
+            : [file.path];
         await Process.run(opener, args);
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('已保存到 ${file.path}')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('已保存到 ${file.path}')));
         }
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('下载失败：$e')));
       }
     }
   }
@@ -673,8 +703,11 @@ class _ErrorCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.error_outline,
-              size: 44, color: Theme.of(context).colorScheme.error),
+          Icon(
+            Icons.error_outline,
+            size: 44,
+            color: Theme.of(context).colorScheme.error,
+          ),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -686,10 +719,7 @@ class _ErrorCard extends StatelessWidget {
                   onPressed: () => showLoginCard(context),
                   child: const Text('去登录'),
                 )
-              : FilledButton.tonal(
-                  onPressed: onRetry,
-                  child: const Text('重试'),
-                ),
+              : FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
         ],
       ),
     );
@@ -698,10 +728,7 @@ class _ErrorCard extends StatelessWidget {
 
 /// Custom control bar: mouse + touch, keyboard shortcuts, drag gestures.
 class _HuichuangControls extends StatefulWidget {
-  const _HuichuangControls({
-    required this.state,
-    required this.isDesktop,
-  });
+  const _HuichuangControls({required this.state, required this.isDesktop});
 
   final VideoState state;
   final bool isDesktop;
@@ -772,10 +799,11 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
       await windowManager.setFullScreen(!isFs);
     } else {
       final route = FullscreenVideoRoute(
-          child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: widget.state.widget),
-      ));
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(child: widget.state.widget),
+        ),
+      );
       await Navigator.of(context).push(route);
     }
   }
@@ -800,7 +828,10 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
   void _onPointerMove(PointerMoveEvent e) {
     final dx = e.position.dx - _dragStartDx;
     final dy = e.position.dy - _dragStartDy;
-    if (!_draggingSeek && !_draggingVolume && dx.abs() > dy.abs() && dx.abs() > 14) {
+    if (!_draggingSeek &&
+        !_draggingVolume &&
+        dx.abs() > dy.abs() &&
+        dx.abs() > 14) {
       _draggingSeek = true;
     } else if (!_draggingSeek &&
         !_draggingVolume &&
@@ -810,12 +841,14 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
     }
     if (_draggingSeek) {
       final width = MediaQuery.sizeOf(context).width;
-      final deltaSec = (dx / width) *
-          (widget.state.widget.controller.player.state.duration.inSeconds
-                  .clamp(60, 600)) *
+      final deltaSec =
+          (dx / width) *
+          (widget.state.widget.controller.player.state.duration.inSeconds.clamp(
+            60,
+            600,
+          )) *
           2;
-      _dragPreview =
-          _seekBase + Duration(seconds: deltaSec.round());
+      _dragPreview = _seekBase + Duration(seconds: deltaSec.round());
       setState(() {});
     } else if (_draggingVolume) {
       final height = MediaQuery.sizeOf(context).height;
@@ -850,142 +883,161 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
     return Focus(
       autofocus: widget.isDesktop,
       child: KeyboardListener(
-      focusNode: _focusNode,
-      onKeyEvent: _onKey,
-      child: MouseRegion(
-        // Desktop: hovering reveals the control bar — no click needed.
-        onHover: widget.isDesktop ? (_) => _poke() : null,
-        child: Listener(
-        onPointerDown: (e) {
-          _onPointerDown(e);
-          _poke();
-        },
-        onPointerMove: _onPointerMove,
-        onPointerUp: _onPointerUp,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _toggleControls,
-          onDoubleTap: _toggleFullscreen,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Progress-independent overlays.
-              if (_dragPreview != null) _dragOverlay('$_fmtDur(_dragPreview!)'),
-              if (_volumePreview != null)
-                _dragOverlay('音量 ${_volumePreview!.round()}%'),
-              AnimatedOpacity(
-                opacity: _visible ? 1 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: IgnorePointer(
-                  ignoring: !_visible,
-                  child: Column(
-                    children: [
-                      const Spacer(),
-                      // Top gradient with title omitted — appbar has it.
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.55),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _ProgressBar(
-                              position: position,
-                              duration: duration,
-                              bufferedEnd: bufferedEnd,
-                              onSeek: (d) => media.seek(d),
+        focusNode: _focusNode,
+        onKeyEvent: _onKey,
+        child: MouseRegion(
+          // Desktop: hovering reveals the control bar — no click needed.
+          onHover: widget.isDesktop ? (_) => _poke() : null,
+          child: Listener(
+            onPointerDown: (e) {
+              _onPointerDown(e);
+              _poke();
+            },
+            onPointerMove: _onPointerMove,
+            onPointerUp: _onPointerUp,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _toggleControls,
+              onDoubleTap: _toggleFullscreen,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Progress-independent overlays.
+                  if (_dragPreview != null)
+                    _dragOverlay('$_fmtDur(_dragPreview!)'),
+                  if (_volumePreview != null)
+                    _dragOverlay('音量 ${_volumePreview!.round()}%'),
+                  AnimatedOpacity(
+                    opacity: _visible ? 1 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: IgnorePointer(
+                      ignoring: !_visible,
+                      child: Column(
+                        children: [
+                          const Spacer(),
+                          // Top gradient with title omitted — appbar has it.
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                            Row(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.55),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  tooltip: '播放/暂停 (空格)',
-                                  icon: Icon(
-                                    media.state.playing
-                                        ? Icons.pause
-                                        : Icons.play_arrow,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: _togglePlay,
+                                _ProgressBar(
+                                  position: position,
+                                  duration: duration,
+                                  bufferedEnd: bufferedEnd,
+                                  onSeek: (d) => media.seek(d),
                                 ),
-                                IconButton(
-                                  tooltip: '后退 10 秒 (←)',
-                                  icon: const Icon(Icons.replay_10,
-                                      color: Colors.white),
-                                  onPressed: () => _seekBy(-10),
-                                ),
-                                IconButton(
-                                  tooltip: '前进 10 秒 (→)',
-                                  icon: const Icon(Icons.forward_10,
-                                      color: Colors.white),
-                                  onPressed: () => _seekBy(10),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8),
-                                  child: Text(
-                                    '${_fmtDur(position)} / ${_fmtDur(duration)}',
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 13),
-                                  ),
-                                ),
-                                const Spacer(),
-                                if (widget.isDesktop)
-                                  _VolumeControl(
-                                    player: media,
-                                  ),
-                                PopupMenuButton<double>(
-                                  tooltip: '倍速',
-                                  initialValue: _speed,
-                                  onSelected: _setSpeed,
-                                  itemBuilder: (_) => [
-                                    for (final s in const [
-                                      0.5, 0.75, 1.0, 1.25, 1.5, 2.0
-                                    ])
-                                      PopupMenuItem(
-                                        value: s,
-                                        child: Text(
-                                            s == 1.0 ? '正常' : '$s×'),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      tooltip: '播放/暂停 (空格)',
+                                      icon: Icon(
+                                        media.state.playing
+                                            ? Icons.pause
+                                            : Icons.play_arrow,
+                                        color: Colors.white,
                                       ),
-                                  ],
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10),
-                                    child: Text(
-                                      _speed == 1.0 ? '倍速' : '$_speed×',
-                                      style: const TextStyle(
-                                          color: Colors.white, fontSize: 13),
+                                      onPressed: _togglePlay,
                                     ),
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: '全屏 (F)',
-                                  icon: const Icon(Icons.fullscreen,
-                                      color: Colors.white),
-                                  onPressed: _toggleFullscreen,
+                                    IconButton(
+                                      tooltip: '后退 10 秒 (←)',
+                                      icon: const Icon(
+                                        Icons.replay_10,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () => _seekBy(-10),
+                                    ),
+                                    IconButton(
+                                      tooltip: '前进 10 秒 (→)',
+                                      icon: const Icon(
+                                        Icons.forward_10,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () => _seekBy(10),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                      child: Text(
+                                        '${_fmtDur(position)} / ${_fmtDur(duration)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    if (widget.isDesktop)
+                                      _VolumeControl(player: media),
+                                    PopupMenuButton<double>(
+                                      tooltip: '倍速',
+                                      initialValue: _speed,
+                                      onSelected: _setSpeed,
+                                      itemBuilder: (_) => [
+                                        for (final s in const [
+                                          0.5,
+                                          0.75,
+                                          1.0,
+                                          1.25,
+                                          1.5,
+                                          2.0,
+                                        ])
+                                          PopupMenuItem(
+                                            value: s,
+                                            child: Text(
+                                              s == 1.0 ? '正常' : '$s×',
+                                            ),
+                                          ),
+                                      ],
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                        ),
+                                        child: Text(
+                                          _speed == 1.0 ? '倍速' : '$_speed×',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: '全屏 (F)',
+                                      icon: const Icon(
+                                        Icons.fullscreen,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: _toggleFullscreen,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-        ),
-      ),
       ),
     );
   }
@@ -993,8 +1045,7 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
   void _onKey(KeyEvent e) {
     if (e is! KeyDownEvent) return;
     final key = e.logicalKey;
-    if (key == LogicalKeyboardKey.space ||
-        key == LogicalKeyboardKey.keyK) {
+    if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
       _togglePlay();
     } else if (key == LogicalKeyboardKey.arrowLeft) {
       _seekBy(-10);
@@ -1026,17 +1077,18 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
   }
 
   Widget _dragOverlay(String text) => Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(text,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 16)),
-        ),
-      );
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 16),
+      ),
+    ),
+  );
 }
 
 String _fmtDur(Duration d) {
@@ -1073,69 +1125,66 @@ class _ProgressBarState extends State<_ProgressBar> {
   Widget build(BuildContext context) {
     final total = widget.duration.inMilliseconds;
     final pos = widget.position.inMilliseconds;
-    final value = total <= 0
-        ? 0.0
-        : (_dragging ? _dragValue : pos / total);
+    final value = total <= 0 ? 0.0 : (_dragging ? _dragValue : pos / total);
     final bufferedEnd = total <= 0
         ? 0.0
         : widget.bufferedEnd.inMilliseconds / total;
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final width = constraints.maxWidth;
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: (_) {
-          setState(() {
-            _dragging = true;
-            _dragValue = value;
-          });
-        },
-        onHorizontalDragUpdate: (d) {
-          setState(() {
-            _dragValue =
-                (_dragValue + d.delta.dx / width).clamp(0.0, 1.0);
-          });
-        },
-        onHorizontalDragEnd: (_) async {
-          await widget.onSeek(Duration(
-              milliseconds: (_dragValue * total).round()));
-          setState(() => _dragging = false);
-        },
-        onTapUp: (d) async {
-          final frac = (d.localPosition.dx / width).clamp(0.0, 1.0);
-          await widget.onSeek(
-              Duration(milliseconds: (frac * total).round()));
-        },
-        child: SizedBox(
-          height: 22,
-          child: Stack(
-            alignment: Alignment.centerLeft,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: bufferedEnd.clamp(0.0, 1.0),
-                  minHeight: 4,
-                  backgroundColor: Colors.white24,
-                  valueColor:
-                      const AlwaysStoppedAnimation(Colors.white38),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (_) {
+            setState(() {
+              _dragging = true;
+              _dragValue = value;
+            });
+          },
+          onHorizontalDragUpdate: (d) {
+            setState(() {
+              _dragValue = (_dragValue + d.delta.dx / width).clamp(0.0, 1.0);
+            });
+          },
+          onHorizontalDragEnd: (_) async {
+            await widget.onSeek(
+              Duration(milliseconds: (_dragValue * total).round()),
+            );
+            setState(() => _dragging = false);
+          },
+          onTapUp: (d) async {
+            final frac = (d.localPosition.dx / width).clamp(0.0, 1.0);
+            await widget.onSeek(Duration(milliseconds: (frac * total).round()));
+          },
+          child: SizedBox(
+            height: 22,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: bufferedEnd.clamp(0.0, 1.0),
+                    minHeight: 4,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation(Colors.white38),
+                  ),
                 ),
-              ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: value.clamp(0.0, 1.0),
-                  minHeight: 4,
-                  backgroundColor: Colors.transparent,
-                  valueColor:
-                      const AlwaysStoppedAnimation(Color(0xFF5B8DEF)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: value.clamp(0.0, 1.0),
+                    minHeight: 4,
+                    backgroundColor: Colors.transparent,
+                    valueColor: const AlwaysStoppedAnimation(Color(0xFF5B8DEF)),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   }
 }
 
@@ -1166,10 +1215,10 @@ class _VolumeControl extends StatelessWidget {
 
 class FullscreenVideoRoute extends PageRouteBuilder<void> {
   FullscreenVideoRoute({required Widget child})
-      : super(
-          pageBuilder: (_, _, _) => child,
-          fullscreenDialog: true,
-          opaque: true,
-          transitionDuration: Duration.zero,
-        );
+    : super(
+        pageBuilder: (_, _, _) => child,
+        fullscreenDialog: true,
+        opaque: true,
+        transitionDuration: Duration.zero,
+      );
 }
