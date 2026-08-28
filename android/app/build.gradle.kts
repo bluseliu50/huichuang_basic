@@ -24,10 +24,30 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            // Fixed signing identity: CI decodes the keystore from the
+            // KEYSTORE_BASE64 secret and points HC_KEYSTORE_PATH at it, so
+            // every shipped APK is signed with the same certificate and
+            // updates install over previous ones. Absent locally, so plain
+            // local builds keep using the debug keys.
+            val ksPath = System.getenv("HC_KEYSTORE_PATH")
+            if (ksPath != null) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("HC_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("HC_KEY_ALIAS")
+                keyPassword = System.getenv("HC_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (System.getenv("HC_KEYSTORE_PATH") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                // Signing with the debug keys for now, so `flutter run --release` works.
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

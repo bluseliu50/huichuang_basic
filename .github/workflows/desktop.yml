@@ -125,8 +125,57 @@ jobs:
             libmpv-dev libsecret-1-dev libjsoncpp-dev \
             librsvg2-dev libgirepository1.0-dev
 
-      - name: Build (macOS, ad-hoc signed)
+      # Fixed macOS signing: when the MACOS_CERT_P12_BASE64 /
+      # MACOS_CERT_PASSWORD secrets exist, import the certificate into a
+      # temporary keychain and sign with the real identity — Keychain items
+      # (the credential vault, biometric unlock) then survive reinstalling
+      # the artifact. Without the secrets, fall back to ad-hoc.
+      - name: Import macOS signing certificate (optional)
+        id: macos_cert
         if: runner.os == 'macOS'
+        env:
+          P12: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          PW: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$P12" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          KC="$RUNNER_TEMP/build.keychain"
+          KC_PW=$(openssl rand -hex 16)
+          security create-keychain -p "$KC_PW" "$KC"
+          security set-keychain-settings -t 3600 "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$PW" -T /usr/bin/codesign
+          security unlock-keychain -p "$KC_PW" "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PW" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          IDENTITY=$(security find-identity -v -p codesigning "$KC" | awk -F'"' '/1)/{print $2; exit}')
+          test -n "$IDENTITY"
+          TEAM=$(security find-certificate -c "$IDENTITY" -p "$KC" \
+            | openssl x509 -noout -subject | sed -nE 's/.*OU = ([^,/]*).*/\1/p')
+          test -n "$TEAM"
+          echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+          echo "team=$TEAM" >> "$GITHUB_OUTPUT"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build (macOS, certificate signed)
+        if: runner.os == 'macOS' && steps.macos_cert.outputs.available == 'true'
+        run: |
+          PB=macos/Runner.xcodeproj/project.pbxproj
+          # Point the project at the imported identity (names contain '/',
+          # hence the | delimiter).
+          sed -i '' -E \
+            -e "s|\"CODE_SIGN_IDENTITY\[sdk=macosx\*\]\" = \"[^\"]*\";|\"CODE_SIGN_IDENTITY[sdk=macosx*]\" = \"${{ steps.macos_cert.outputs.identity }}\";|g" \
+            -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' \
+            -e "s|DEVELOPMENT_TEAM = [^;]*;|DEVELOPMENT_TEAM = ${{ steps.macos_cert.outputs.team }};|g" \
+            "$PB"
+          flutter build macos --release
+          codesign -dv build/macos/Build/Products/Release/huichuang_basic.app 2>&1 \
+            | grep -vq 'Signature=adhoc'
+
+      - name: Build (macOS, ad-hoc signed)
+        if: runner.os == 'macOS' && steps.macos_cert.outputs.available != 'true'
         run: |
           # CI holds no certificate; rewrite signing to ad-hoc in the
           # checked-out project only. Verified locally: the sdk-scoped

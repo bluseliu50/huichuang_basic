@@ -1,4 +1,4 @@
-# Android build — release APK, signed with the debug keystore.
+# Android build — release APK signed with the pinned release certificate.
 #
 # Manual dispatch ONLY (Actions → android-build → Run workflow). Nothing
 # triggers it automatically: per the desktop rule, expensive builds run
@@ -6,10 +6,11 @@
 # to ship its APK, dispatch this workflow with attach_tag set to the
 # prerelease tag.
 #
-# Signing: the repo has no CI keystore. build.gradle.kts signs release
-# builds with the debug keystore, so artifacts install out of the box —
-# same trust level as the ad-hoc macOS builds in desktop.yml.
-name: android-build
+# Signing: the release keystore arrives via the KEYSTORE_BASE64 /
+# KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD repo secrets and is decoded
+# at build time — every shipped APK carries the SAME pinned certificate, so
+# updates install over previous ones. Without the secrets the gradle build
+# falls back to the per-runner debug keystore (dev builds only).
 
 on:
   workflow_dispatch:
@@ -61,7 +62,19 @@ jobs:
       - name: Show toolchain
         run: flutter --version && dart --version
 
-      - name: Build APK (release, debug-signed)
+      - name: Restore pinned release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          [ -n "$KEYSTORE_BASE64" ] || { echo "KEYSTORE_BASE64 secret missing"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
+      - name: Build APK (release, pinned-cert signed)
+        env:
+          HC_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          HC_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          HC_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          HC_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           flutter build apk --release \
             ${{ inputs.abi == 'split-per-abi' && '--split-per-abi' || '' }}
