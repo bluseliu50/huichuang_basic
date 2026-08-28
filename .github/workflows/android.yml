@@ -12,6 +12,11 @@
 # updates install over previous ones. Without the secrets the gradle build
 # falls back to the per-runner debug keystore (dev builds only).
 
+name: android-build
+
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -26,6 +31,7 @@ on:
         description: 'Release tag to attach the APK(s) to (empty = artifact only)'
         type: string
         default: ''
+
 
 concurrency:
   group: android-${{ github.ref }}
@@ -83,7 +89,7 @@ jobs:
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
           # universal → android; split → arm64-v8a / armeabi-v7a / x86_64.
-          for f in build/app/outputs/flutter-apk/*-release.apk; do
+          for f in build/app/outputs/flutter-apk/*.apk; do
             suffix=$(basename "$f" | sed -E 's/^app-(.*)-release\.apk$/\1/;s/^release$/android/')
             mv "$f" "$(dirname "$f")/huichuang_basic-v${APP_VERSION}-${suffix}.apk"
           done
@@ -94,7 +100,7 @@ jobs:
         # space-joined list would be treated as one (non-matching) pattern.
         run: |
           echo "files<<FILES_EOF" >> "$GITHUB_OUTPUT"
-          ls build/app/outputs/flutter-apk/*-release.apk >> "$GITHUB_OUTPUT"
+          ls build/app/outputs/flutter-apk/*.apk >> "$GITHUB_OUTPUT"
           echo "FILES_EOF" >> "$GITHUB_OUTPUT"
           ls -l build/app/outputs/flutter-apk
 
