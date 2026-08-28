@@ -32,6 +32,22 @@ commercial distribution.
 5. New dependencies require a strong justification written in the commit body.
    Current dependency set is intentional and locked.
 
+6. **Prefer the harness's own tools over raw shell commands** (this applies
+   to every AI agent working here, especially the pi/omp harness's Grep and
+   Find/Glob). The harness can batch, anchor and validate built-in calls;
+   shell equivalents are shadowed or blocked. Concretely:
+   - Text search → `Grep` tool, never bash `grep` / `rg`.
+     Example: find token handling → Grep pattern `access_token` in `lib/`.
+   - File discovery → `Glob`/Find tool, never `find` / `fd` / `ls **`.
+     Example: list tests → Glob `test/**/*_test.dart`.
+   - Reading → `Read` with line selectors (`lib/src/api/client.dart:50-120`),
+     not `cat` / `head` / `tail`.
+   - Editing → `Edit` / `Write` tools, not `sed -i` or output redirection.
+   - Symbol-aware navigation → `LSP` (definition / references / rename)
+     when a server is available; never regex-rename across files.
+   - `Bash` is for real binaries and short fact pipelines (`wc -l`, `md5sum`,
+     `fvm flutter …`), one call computing one fact.
+
 ## Architecture
 
 ```
