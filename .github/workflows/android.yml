@@ -89,8 +89,15 @@ jobs:
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
           # universal → android; split → arm64-v8a / armeabi-v7a / x86_64.
+          # case, not a single sed: the plain app-release.apk name has no
+          # middle segment, and a non-matching regex would keep the whole
+          # 'app-release.apk' as the suffix, yielding a .apk.apk asset.
           for f in build/app/outputs/flutter-apk/*.apk; do
-            suffix=$(basename "$f" | sed -E 's/^app-(.*)-release\.apk$/\1/;s/^release$/android/')
+            case "$(basename "$f")" in
+              app-release.apk)   suffix=android ;;
+              app-*-release.apk) suffix=$(basename "$f" | sed -E 's/^app-(.*)-release\.apk$/\1/') ;;
+              *)                 suffix=$(basename "$f" .apk) ;;
+            esac
             mv "$f" "$(dirname "$f")/huichuang_basic-v${APP_VERSION}-${suffix}.apk"
           done
 
