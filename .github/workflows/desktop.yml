@@ -1,13 +1,21 @@
 # Desktop release builds — macOS / Linux / Windows.
 #
-# Triggered ONLY manually (Actions → Run workflow) and when a GitHub
-# Release is published. Deliberately NOT wired to push/commit messages:
-# a full three-platform build is expensive, and commit-message-driven CI
-# tempts you to push junk commits just to kick a build. Use the button.
+# Triggers:
+#   - Manual dispatch (Actions → desktop-build → Run workflow) with an
+#     optional platform filter and an optional release tag to attach to.
+#   - A STABLE GitHub release being published builds every platform and
+#     attaches the archives. A PRERELEASE builds NOTHING — ship its
+#     artifacts by dispatching this workflow (desktop and/or android)
+#     with the platform(s) you want and attach_tag set to the prerelease.
+#
+# Deliberately NOT wired to push/commit messages: a full three-platform
+# build is expensive, and commit-message-driven CI tempts you to push
+# junk commits just to kick a build. Use the button.
 #
 # Artifacts:
 #   - Every run uploads zips/tarballs as workflow artifacts.
-#   - On a published release the archives are also attached to the release.
+#   - On a published stable release (or when attach_tag is set) the
+#     archives are also attached to that release.
 #
 # Caveat: the macOS job signs ad-hoc (no certificate in CI). The app runs
 # fine, but Keychain items are bound to the signing identity, so the
@@ -17,6 +25,20 @@ name: desktop-build
 
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: Which platform to build
+        type: choice
+        default: all
+        options:
+          - all
+          - macos-arm64
+          - linux-x64
+          - windows-x64
+      attach_tag:
+        description: 'Release tag to attach the archive(s) to (empty = artifact only)'
+        type: string
+        default: ''
   release:
     types: [published]
 
@@ -25,18 +47,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Job-level `if` cannot see `matrix` (it is evaluated before the
+  # strategy expands), so platform selection and the prerelease guard
+  # resolve here into the matrix the build job will run.
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      include: ${{ steps.select.outputs.include }}
+    steps:
+      - id: select
+        run: |
+          all='[{"name":"macos-arm64","os":"macos-14"},{"name":"linux-x64","os":"ubuntu-22.04"},{"name":"windows-x64","os":"windows-2022"}]'
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            # Prereleases never start automatic builds; the artifacts are
+            # shipped by dispatching this workflow with attach_tag set.
+            if [ "$PRERELEASE" = "true" ]; then
+              echo "include=[]" >> "$GITHUB_OUTPUT"
+            else
+              echo "include=$all" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            case "$PLATFORMS" in
+              all) echo "include=$all" >> "$GITHUB_OUTPUT" ;;
+              macos-arm64) echo 'include=[{"name":"macos-arm64","os":"macos-14"}]' >> "$GITHUB_OUTPUT" ;;
+              linux-x64) echo 'include=[{"name":"linux-x64","os":"ubuntu-22.04"}]' >> "$GITHUB_OUTPUT" ;;
+              windows-x64) echo 'include=[{"name":"windows-x64","os":"windows-2022"}]' >> "$GITHUB_OUTPUT" ;;
+              *) echo "include=[]" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+        env:
+          PLATFORMS: ${{ inputs.platforms }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+
   build:
     name: ${{ matrix.name }}
+    needs: setup
+    if: needs.setup.outputs.include != '[]'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: macos-arm64
-            os: macos-14
-          - name: linux-x64
-            os: ubuntu-22.04
-          - name: windows-x64
-            os: windows-2022
+        include: ${{ fromJSON(needs.setup.outputs.include) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -51,10 +102,11 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
           test -n "$v"
 
+      # No channel override: the pinned version (e.g. 3.48.0-0.3.pre) is a
+      # beta build; flutter-action infers the channel from the version string.
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ steps.fv.outputs.version }}
-          channel: stable
           cache: true
 
       - name: Show toolchain
@@ -181,10 +233,9 @@ jobs:
           path: ${{ steps.dist.outputs.files }}
           compression-level: 0
           if-no-files-found: error
-
       - name: Attach to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.attach_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: gh release upload "$GITHUB_REF_NAME" ${{ steps.dist.outputs.files }} --clobber
+          ATTACH_TAG: ${{ github.event_name == 'release' && github.ref_name || inputs.attach_tag }}
+        run: gh release upload "$ATTACH_TAG" ${{ steps.dist.outputs.files }} --clobber
