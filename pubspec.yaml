@@ -80,8 +80,15 @@ flutter:
 # proguard fix upstream already has on master (proguard-android.txt →
 # proguard-android-optimize.txt; AGP 9 hard-errors on the legacy file).
 # Drop the override once upstream ships ≥1.1.4/1.2.0.
+# Vendored from pub.dev pdfrx 2.4.8: createImage swaps BGRA→RGBA and
+# uploads as PixelFormat.rgba8888 (upstream bgra8888 raw uploads composite
+# to blank pages on a Pixel 9 Pro Fold, Tensor G3 / Mali-G715, Android 16).
+# Upstream path kept as fallback. Drop the override once upstream grows a
+# pixel-format workaround or the platform bug is pinned down.
 dependency_overrides:
   desktop_webview_window:
     path: third_party/desktop_webview_window
   flutter_inappwebview_android:
     path: third_party/flutter_inappwebview_android
+  pdfrx:
+    path: third_party/pdfrx
