@@ -6,6 +6,10 @@
 //  - 教材: the filter levels and the book grid must share ONE scroll view;
 //    the old fixed-height horizontal picker rows starved the grid on short
 //    viewports.
+//  - Dynamic width (issue #3): mobile windows change width live (rotation,
+//    split-screen, foldables). A landscape phone is 600–1000 logical px
+//    wide — below every portrait threshold — yet must get the wide layouts;
+//    its height is the scarce axis. HcLayout is the shared arbiter.
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -14,7 +18,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:huichuang_basic/src/api/client.dart';
 import 'package:huichuang_basic/src/api/models.dart';
 import 'package:huichuang_basic/src/api/catalog.dart';
+import 'package:huichuang_basic/src/auth/auth_controller.dart';
+import 'package:huichuang_basic/src/auth/biometric.dart';
+import 'package:huichuang_basic/src/auth/token_store.dart';
 import 'package:huichuang_basic/src/store/app_state.dart';
+import 'package:huichuang_basic/src/ui/app_shell.dart';
+import 'package:huichuang_basic/src/ui/breakpoints.dart';
 import 'package:huichuang_basic/src/ui/courses/courses_page.dart';
 import 'package:huichuang_basic/src/ui/pdf/textbooks_page.dart';
 import 'package:huichuang_basic/src/ui/player/player_page.dart';
@@ -297,5 +306,102 @@ void main() {
     final top = box.localToGlobal(Offset.zero).dy;
     expect(top, greaterThan(0));
     expect(top + box.size.height, lessThan(380));
+  });
+  testWidgets('HcLayout: landscape escapes the width thresholds',
+      (tester) async {
+    // (twoPane@1000, twoPane@900, extendedRail) per window size.
+    final results = <(bool, bool, bool)>[];
+    Future<void> probe(Size size) async {
+      await tester.pumpWidget(MediaQuery(
+        data: MediaQueryData(size: size),
+        child: Builder(
+          builder: (context) {
+            results.add((
+              HcLayout.twoPane(context),
+              HcLayout.twoPane(context, minWidth: 900),
+              HcLayout.extendedRail(context),
+            ));
+            return const SizedBox.shrink();
+          },
+        ),
+      ));
+    }
+
+    await probe(const Size(500, 900)); // portrait phone
+    expect(results.last, (false, false, false));
+    await probe(const Size(892, 412)); // landscape phone, sub-threshold
+    expect(results.last, (true, true, false));
+    await probe(const Size(999, 1200)); // tall portrait, below 1000
+    expect(results.last, (false, true, false));
+    await probe(const Size(1000, 1200)); // portrait at the shell threshold
+    expect(results.last, (true, true, false));
+    await probe(const Size(1300, 800)); // desktop-class
+    expect(results.last, (true, true, true));
+  });
+
+  testWidgets('shell: landscape phone swaps the bottom bar for a rail',
+      (tester) async {
+    _narrow(tester, size: const Size(892, 412));
+    // Textbooks preloaded so no tab sits in an endless spinner.
+    final app =
+        await _app(tester, after: (app) => app.catalog.loadTextbooks());
+    final auth = AuthController(
+      store: TokenStore(MemoryKV()),
+      settings: await AppSettings.load(),
+      biometrics: FakeBiometricGate(),
+    );
+    await tester.pumpWidget(MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppController>.value(value: app),
+        ChangeNotifierProvider<AuthController>.value(value: auth),
+      ],
+      child: const MaterialApp(home: AppShell()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('shell: portrait phone keeps the bottom navigation bar',
+      (tester) async {
+    _narrow(tester); // 500×900 portrait
+    final app =
+        await _app(tester, after: (app) => app.catalog.loadTextbooks());
+    final auth = AuthController(
+      store: TokenStore(MemoryKV()),
+      settings: await AppSettings.load(),
+      biometrics: FakeBiometricGate(),
+    );
+    await tester.pumpWidget(MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppController>.value(value: app),
+        ChangeNotifierProvider<AuthController>.value(value: auth),
+      ],
+      child: const MaterialApp(home: AppShell()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+  });
+
+  testWidgets('landscape courses: chapter tree and lesson pane side by side',
+      (tester) async {
+    _narrow(tester, size: const Size(892, 412));
+    final app = await _app(tester,
+        after: (app) => app.openMaterial(_courseMaterial));
+    await tester.pumpWidget(_host(app, const CoursesPage()));
+    await tester.pumpAndSettle();
+
+    // The wide layout's divider between tree and pane.
+    expect(find.byType(VerticalDivider), findsOneWidget);
+
+    // Tapping a leaf fills the side pane in place — no route push, no
+    // inline expansion (that is the narrow-tree contract instead).
+    await tester.tap(find.text('第一节 春晓'));
+    await tester.pumpAndSettle();
+    expect(find.text('春晓第一课'), findsOneWidget);
+    expect(find.text('春晓第二课'), findsOneWidget);
   });
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../api/models.dart';
 import '../../store/app_state.dart';
+import '../breakpoints.dart';
 import '../player/player_page.dart';
 
 /// Uniform typography for every row of the mobile chapter tree — plain
@@ -223,7 +224,7 @@ class _BrowserBodyState extends State<_BrowserBody> {
     final selected =
         _findChapter(app.chapters, _selectedChapterId) ?? app.chapters.first;
     final selectedLessons = app.lessonsFor(selected);
-    final wide = MediaQuery.sizeOf(context).width >= 1000;
+    final wide = HcLayout.twoPane(context);
 
     if (!wide) {
       // Mobile: chapters as expandable tiles with inline lessons.
@@ -244,7 +245,7 @@ class _BrowserBodyState extends State<_BrowserBody> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          width: 300,
+          width: (MediaQuery.sizeOf(context).width * 0.36).clamp(240.0, 300.0),
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
             itemCount: app.chapters.length,

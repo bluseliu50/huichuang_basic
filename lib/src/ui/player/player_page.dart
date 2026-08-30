@@ -14,6 +14,7 @@ import '../../api/models.dart';
 import '../../auth/auth_controller.dart';
 import '../../store/app_state.dart';
 import '../../stream/proxy.dart';
+import '../breakpoints.dart';
 import '../login/login_card.dart';
 import '../pdf/pdf_reader_page.dart';
 
@@ -212,7 +213,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide = HcLayout.twoPane(context, minWidth: 900);
     final body = _loading
         ? const Center(child: CircularProgressIndicator())
         : _error != null
@@ -234,7 +235,11 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               // Video as large as possible, docked left.
               Expanded(child: _buildVideoMax(context)),
-              SizedBox(width: 360, child: _buildSidebar(context)),
+              SizedBox(
+                width:
+                    (MediaQuery.sizeOf(context).width * 0.42).clamp(280.0, 360.0),
+                child: _buildSidebar(context),
+              ),
             ],
           )
         : Column(
