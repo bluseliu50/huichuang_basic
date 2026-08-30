@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../store/app_state.dart';
+import 'breakpoints.dart';
 import 'courses/courses_page.dart';
 import 'home/home_page.dart';
 import 'login/login_card.dart';
@@ -75,9 +76,8 @@ class _AppShellState extends State<AppShell> {
   }
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final wide = width >= 1000;
-    final extended = width >= 1280;
+    final wide = HcLayout.twoPane(context);
+    final extended = HcLayout.extendedRail(context);
 
     final pages = [
       HomePage(onOpenCourses: () => setState(() => _index = 1)),

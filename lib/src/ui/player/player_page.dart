@@ -14,6 +14,7 @@ import '../../api/models.dart';
 import '../../auth/auth_controller.dart';
 import '../../store/app_state.dart';
 import '../../stream/proxy.dart';
+import '../breakpoints.dart';
 import '../login/login_card.dart';
 import '../pdf/pdf_reader_page.dart';
 
@@ -212,7 +213,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide = HcLayout.twoPane(context, minWidth: 840);
     final body = _loading
         ? const Center(child: CircularProgressIndicator())
         : _error != null
@@ -234,7 +235,11 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               // Video as large as possible, docked left.
               Expanded(child: _buildVideoMax(context)),
-              SizedBox(width: 360, child: _buildSidebar(context)),
+              SizedBox(
+                width:
+                    (MediaQuery.sizeOf(context).width * 0.42).clamp(280.0, 360.0),
+                child: _buildSidebar(context),
+              ),
             ],
           )
         : Column(
@@ -751,6 +756,12 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
   double? _volumePreview;
   double _speed = 1.0;
 
+  /// Double-tap zone handling: null = none yet, -1 = left (back 10s),
+  /// +1 = right (forward 10s).
+  double? _doubleTapDx;
+  int? _seekFlash;
+  Timer? _seekFlashTimer;
+
   Player get _player => widget.state.widget.controller.player;
 
   @override
@@ -762,6 +773,7 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _seekFlashTimer?.cancel();
     _focusNode.dispose();
     super.dispose();
   }
@@ -793,15 +805,36 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
     _poke();
   }
 
+  /// Mobile double-tap zones: left third -10s, right third +10s (with a
+  /// flash bubble), center (and any desktop double-click) toggles
+  /// fullscreen — the common mobile video-player contract.
+  Future<void> _onDoubleTap() async {
+    final dx = _doubleTapDx;
+    final width = MediaQuery.sizeOf(context).width;
+    final zone = dx == null ? 0 : (dx < width / 3 ? -1 : dx > width * 2 / 3 ? 1 : 0);
+    if (widget.isDesktop || zone == 0) {
+      await _toggleFullscreen();
+      return;
+    }
+    await _seekBy(zone * 10);
+    setState(() => _seekFlash = zone);
+    _seekFlashTimer?.cancel();
+    _seekFlashTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _seekFlash = null);
+    });
+  }
+
   Future<void> _toggleFullscreen() async {
     if (widget.isDesktop) {
       final isFs = await windowManager.isFullScreen();
       await windowManager.setFullScreen(!isFs);
     } else {
       final route = FullscreenVideoRoute(
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(child: widget.state.widget),
+        child: _ImmersiveScope(
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(child: widget.state.widget),
+          ),
         ),
       );
       await Navigator.of(context).push(route);
@@ -898,7 +931,8 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _toggleControls,
-              onDoubleTap: _toggleFullscreen,
+              onDoubleTapDown: (d) => _doubleTapDx = d.globalPosition.dx,
+              onDoubleTap: _onDoubleTap,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -907,6 +941,28 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
                     _dragOverlay('$_fmtDur(_dragPreview!)'),
                   if (_volumePreview != null)
                     _dragOverlay('音量 ${_volumePreview!.round()}%'),
+                  if (_seekFlash != null)
+                    Align(
+                      alignment: _seekFlash! < 0
+                          ? Alignment.centerLeft
+                          : Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 36),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            _seekFlash! < 0
+                                ? Icons.replay_10
+                                : Icons.forward_10,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                   AnimatedOpacity(
                     opacity: _visible ? 1 : 0,
                     duration: const Duration(milliseconds: 200),
@@ -968,15 +1024,19 @@ class _HuichuangControlsState extends State<_HuichuangControls> {
                                       ),
                                       onPressed: () => _seekBy(10),
                                     ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      child: Text(
-                                        '${_fmtDur(position)} / ${_fmtDur(duration)}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
+                                    Flexible(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        child: Text(
+                                          '${_fmtDur(position)} / ${_fmtDur(duration)}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1221,4 +1281,40 @@ class FullscreenVideoRoute extends PageRouteBuilder<void> {
         opaque: true,
         transitionDuration: Duration.zero,
       );
+}
+
+/// Mobile fullscreen means fullscreen: hide the status/navigation bars,
+/// lock landscape so a 16:9 picture fills the screen, and restore both
+/// when the route pops (dispose also runs on back gesture / pop).
+class _ImmersiveScope extends StatefulWidget {
+  const _ImmersiveScope({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ImmersiveScope> createState() => _ImmersiveScopeState();
+}
+
+class _ImmersiveScopeState extends State<_ImmersiveScope> {
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
+
+  @override
+  void dispose() {
+    // Flutter's default on Android; other modes require an app-wide
+    // migration, so restore exactly this.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(const []);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
