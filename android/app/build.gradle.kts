@@ -41,6 +41,15 @@ android {
         }
     }
     buildTypes {
+        // Distinct package ids so debug/profile builds install beside the
+        // release app instead of failing with INSTALL_FAILED_UPDATE_INCOMPATIBLE
+        // (same id, different signing keys wipes the release app's data).
+        debug {
+            applicationIdSuffix = ".debug"
+        }
+        getByName("profile") {
+            applicationIdSuffix = ".profile"
+        }
         release {
             signingConfig = if (System.getenv("HC_KEYSTORE_PATH") != null) {
                 signingConfigs.getByName("release")

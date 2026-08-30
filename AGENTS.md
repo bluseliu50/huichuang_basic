@@ -74,6 +74,8 @@ lib/src/store/app_state.dart      — AppController: selection, chapters, histor
 lib/src/ui/                       — app_shell (adaptive rail/bottom bar), courses,
                                      player (media_kit + custom controls), pdf,
                                      search (local index), settings, home, login
+   └ breakpoints.dart             — HcLayout: shared M3 window-size-class rules
+                                     (every responsive decision goes through it)
 tool/live_check.dart              — real-platform end-to-end proxy verification
 test/                             — unit tests with byte-level real fixtures
 third_party/pdfrx                 — vendored pdfrx 2.4.8: createImage
@@ -105,6 +107,16 @@ any proxy / player / auth change additionally requires a `live_check` PASS or a
 macOS E2E log containing `PLAYER_OPEN` and `PLAYER_DURATION <n>s`.
 
 macOS E2E: `HC_E2E_TOKEN='<full token json>' HC_E2E_RESID=<resId> <debug binary>`.
+
+Do NOT run bare `fvm dart format` on existing files: the pinned SDK formats
+with the new tall style while the repo is written in the old short style — a
+format pass rewrites whole files as diff noise. Match the surrounding style
+by hand. Layout widget tests at arbitrary window sizes live in
+`test/narrow_layout_test.dart` — reuse its `_FakeClient`/`_app` harness and
+`_narrow(tester, size:)` (791×820 ≈ Pixel 9 Pro Fold inner screen, 892×412 a
+landscape phone). Pumping the whole `AppShell` needs an `AuthController` in
+the tree and textbooks preloaded, or an IndexedStack tab spins forever and
+`pumpAndSettle` times out.
 
 Android on this workstation: `export JAVA_HOME="/Applications/Android
 Studio.app/Contents/jbr/Contents/Home"` before gradle/apksigner work. Verify
@@ -165,6 +177,15 @@ the pubspec version: `huichuang_basic-v<version>-android.apk` (universal) or
 `flutter-action`'s `channel: beta`; the stable default fails. Dispatch by
 file name (`gh workflow run android.yml`) — the display name can stop
 resolving after old runs are deleted.
+- Debug/profile builds carry `.debug` / `.profile` `applicationIdSuffix` so
+  they install BESIDE the release app — same applicationId with different
+  signing keys fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, and the only
+  workaround (uninstall) wipes the release app's data. Release id, CI signing
+  and the local debug-signing fallback are untouched; secure storage is keyed
+  by package id, so the debug app starts with fresh data (first-run login).
+  In Kotlin DSL the profile buildType must be configured via `getByName`
+  (the Flutter plugin pre-creates it; bare `profile {}` resolves against the
+  Kotlin source-set extension and fails to compile).
 
 ## Load-bearing decisions (do not revert without equivalent re-verified fixes)
 
@@ -175,6 +196,18 @@ resolving after old runs are deleted.
   the proxy fetches without auth and mpv fails with 401.
 - Player video area is height-constrained (flex) inside a Column — an
   unconstrained AspectRatio clips the controls layer.
+- Every responsive-layout decision goes through `HcLayout`
+  (`lib/src/ui/breakpoints.dart`): Material 3 window-size classes — ≥600
+  (medium: fold inner portrait ~791dp, tablet portrait, desktop) gets the
+  two-pane layouts + navigation rail, ≥840 (expanded) splits the player
+  side-by-side, ANY landscape window is two-pane (height is the scarce
+  axis). Do not hardcode width thresholds in pages. The portrait player
+  stack is a width-driven 16:9 video — it must never render in landscape
+  (RenderFlex overflow past the screen height).
+- Mobile fullscreen is the `_ImmersiveScope`-wrapped `FullscreenVideoRoute`:
+  `immersiveSticky` + landscape lock on enter, `edgeToEdge` + free rotation
+  restored on pop (dispose covers the back gesture). Keep the restore —
+  other `SystemUiMode`s need an app-wide migration on this SDK.
 - Textbook tag tree has a root "电子教材" container; drill into the `zxxxd` layer.
 - Remote search (`x-search`) is blocked by WAF TLS/IP fingerprinting — the local
   search index is the final design, do not retry remote search.
@@ -206,6 +239,10 @@ Conventional Commits, imperative mood, ≤72-char summary:
   `search`, `settings`, `android`, `ios`, `macos`, `windows`, `linux`
 - Body explains **why**, not what the diff shows. Evidence (test counts, log
   lines) goes in the body for streaming/auth changes.
+- Commit with the account's noreply address (`git config user.email
+  265648257+bluseliu50@users.noreply.github.com`, already set repo-locally):
+  the GitHub email-privacy block rejects pushes exposing the private address
+  (GH007).
 - Commit small and often; one logical change per commit; never rewrite published
   history. Rewrites happen only on the user's explicit order — push with
   `--force-with-lease` and re-point any release tag afterward.
