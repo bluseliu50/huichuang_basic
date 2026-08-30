@@ -48,6 +48,16 @@ commercial distribution.
    - `Bash` is for real binaries and short fact pipelines (`wc -l`, `md5sum`,
      `fvm flutter …`), one call computing one fact.
 
+7. **Published releases are user-authored.** Never overwrite a release's
+   notes/body or re-publish over an edited release. Ship artifacts by
+   attaching to the existing release (`attach_tag` workflow input), never by
+   recreating it.
+8. **Release tags follow `main`.** After every push, re-point the current
+   release tag to the new HEAD (rolling pointer; the release page does not
+   move):
+   `gh api -X PATCH repos/<owner>/<repo>/git/refs/tags/<tag> -f sha=$(git rev-parse HEAD)`
+   The refs API needs the full 40-char sha — short shas fail with 422.
+
 ## Architecture
 
 ```
@@ -65,6 +75,9 @@ lib/src/ui/                       — app_shell (adaptive rail/bottom bar), cour
                                      search (local index), settings, home, login
 tool/live_check.dart              — real-platform end-to-end proxy verification
 test/                             — unit tests with byte-level real fixtures
+third_party/pdfrx                 — vendored pdfrx 2.4.8: createImage
+                                    BGRA→RGBA fix + neighbor-page prerender
+                                    (wired via dependency_overrides)
 ```
 
 Data flow: UI → AppController → SmarteduClient (public static JSON on
@@ -92,7 +105,13 @@ macOS E2E log containing `PLAYER_OPEN` and `PLAYER_DURATION <n>s`.
 
 macOS E2E: `HC_E2E_TOKEN='<full token json>' HC_E2E_RESID=<resId> <debug binary>`.
 
-## Continuous integration (desktop)
+Android on this workstation: `export JAVA_HOME="/Applications/Android
+Studio.app/Contents/jbr/Contents/Home"` before gradle/apksigner work. Verify
+signatures with `apksigner verify --print-certs` — `keytool -printcert
+-jarfile` cannot read APK v2+ schemes. Widget tests that need real IO use
+`tester.runAsync`; PDF pixel checks render through `sips -s format bmp`.
+
+## Continuous integration (desktop & android)
 
 `.github/workflows/desktop.yml` builds release bundles for macOS (arm64),
 Linux (x64) and Windows (x64) and attaches them to the published release.
@@ -106,11 +125,19 @@ expensive, and commit-message CI ("编译测试" magic strings) invites junk
 pushes just to kick builds. If a build is wanted, press the button or
 publish the release.
 
+Stable releases auto-build; **prereleases do not** — `desktop.yml` opens with
+a setup gate whose matrix stays empty for `release: published` events marked
+prerelease. Ship a prerelease by dispatching manually with `attach_tag`.
+
 - CI holds no certificates, so the macOS job rewrites signing in the
   checked-out `project.pbxproj` via sed (sdk-scoped identity → `-`,
   Automatic → Manual, team → empty) and builds ad-hoc. Ad-hoc artifacts
   run, but Keychain items do not survive a signing-identity change —
   vault-reliable macOS builds must be signed locally with the real team.
+  When `MACOS_CERT_P12_BASE64` / `MACOS_CERT_PASSWORD` secrets exist the job
+  imports the P12 into a throwaway keychain and signs with the real identity
+  instead (step id `macos_cert`); without them it stays on the sed + ad-hoc
+  path.
 - Linux window icon: `assets/icon.png` is installed into `data/` by
   `linux/CMakeLists.txt` and loaded relative to `/proc/self/exe` in
   `linux/runner/my_application.cc`. Keep all three in sync with the icon
@@ -125,6 +152,19 @@ publish the release.
   state survives restarts — the plaintext password is NEVER written there;
   the biometric vault is inert (switch visible but grayed out).
 
+### Android (android.yml)
+
+Manual dispatch only. Inputs: `abi` (`universal` or `split-per-abi`) and
+`attach_tag`. The release keystore is decoded from the `KEYSTORE_BASE64`
+secret (+ `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`) and gradle
+selects the release signing config purely by `HC_KEYSTORE_PATH` being set —
+unset locally, builds fall back to the debug keystore. APK names derive from
+the pubspec version: `huichuang_basic-v<version>-android.apk` (universal) or
+`-<abi>` per split. The pinned Flutter `3.48.0-0.3.pre` resolves only with
+`flutter-action`'s `channel: beta`; the stable default fails. Dispatch by
+file name (`gh workflow run android.yml`) — the display name can stop
+resolving after old runs are deleted.
+
 ## Load-bearing decisions (do not revert without equivalent re-verified fixes)
 
 - `flutter_secure_storage` **v11** + empty `keychain-access-groups` entitlement
@@ -138,6 +178,16 @@ publish the release.
 - Remote search (`x-search`) is blocked by WAF TLS/IP fingerprinting — the local
   search index is the final design, do not retry remote search.
 - Lesson→chapter mapping uses `lesson.chapter_ids.last`.
+- The PDF viewer is the vendored `third_party/pdfrx` (dependency_overrides):
+  `createImage` must keep the BGRA→RGBA swap and the neighbor-page prerender
+  must stay parallel-safe; regenerating or re-pointing the override loses
+  both fixes.
+- Android release signing hinges on `HC_KEYSTORE_PATH`: set in CI to the
+  pinned keystore, absent for local runs (debug signing). The keystore lives
+  outside the repo (`~/.android/huichuang-release.keystore` + off-repo
+  backup) — losing it means installed devices can never upgrade in place.
+- `package_info_plus` must stay `^10.0.0`: older majors pin `win32` ranges
+  that conflict with `flutter_secure_storage_windows`' `win32 ^6`.
 
 ## Commit convention (English only)
 
@@ -156,14 +206,23 @@ Conventional Commits, imperative mood, ≤72-char summary:
 - Body explains **why**, not what the diff shows. Evidence (test counts, log
   lines) goes in the body for streaming/auth changes.
 - Commit small and often; one logical change per commit; never rewrite published
-  history.
+  history. Rewrites happen only on the user's explicit order — push with
+  `--force-with-lease` and re-point any release tag afterward.
 - **Tags**: `vX.Y.Z` (annotated) at milestones — `v0.2.0` playback milestone,
   `v1.0.0` first public release. Tag messages summarize the milestone in
-  English.
+  English. Prerelease tags use the `vX.Y.Z-rc.N` form (`v0.1.0-rc.1` was the
+  first).
 
 ## Release checklist
 
 1. `flutter analyze` + `flutter test` green; live_check PASS.
 2. Secrets audit grep (Hard rule 1) over full history.
-3. Bump `version:` in `pubspec.yaml` when tagging a release.
+3. Bump `version:` in `pubspec.yaml` when tagging a release, and the build
+   number (`+N`) with it — Android `versionCode` must strictly increase or
+   installed devices reject the update.
 4. `git tag -a vX.Y.Z -m "..."` then push `main` and tags together.
+5. Move the release tag to the final commit (Hard rule 8) via the refs API
+   with the full sha.
+6. Prereleases: publish the release with notes only, then dispatch
+   `android-build` / `desktop-build` with `attach_tag=<tag>`; verify attached
+   asset names (`huichuang_basic-v<version>-android.apk`, …).
