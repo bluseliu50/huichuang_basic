@@ -52,11 +52,12 @@ commercial distribution.
    notes/body or re-publish over an edited release. Ship artifacts by
    attaching to the existing release (`attach_tag` workflow input), never by
    recreating it.
-8. **Release tags follow `main`.** After every push, re-point the current
-   release tag to the new HEAD (rolling pointer; the release page does not
-   move):
-   `gh api -X PATCH repos/<owner>/<repo>/git/refs/tags/<tag> -f sha=$(git rev-parse HEAD)`
-   The refs API needs the full 40-char sha — short shas fail with 422.
+8. **Release tags are pinned at the shipped commit.** When a release ships,
+   point its tag at the commit whose tree matches the assets and leave it
+   there — later pushes never move it. `main` keeps advancing; the next
+   release gets its own tag. Pin/move via
+   `gh api -X PATCH repos/<owner>/<repo>/git/refs/tags/<tag> -f sha=<full sha>`
+   — the refs API needs the full 40-char sha (short shas fail with 422).
 
 ## Architecture
 
@@ -221,8 +222,8 @@ Conventional Commits, imperative mood, ≤72-char summary:
    number (`+N`) with it — Android `versionCode` must strictly increase or
    installed devices reject the update.
 4. `git tag -a vX.Y.Z -m "..."` then push `main` and tags together.
-5. Move the release tag to the final commit (Hard rule 8) via the refs API
-   with the full sha.
+5. Pin the release tag to the shipped commit (Hard rule 8) via the refs API
+   with the full sha; verify its tree matches the attached assets.
 6. Prereleases: publish the release with notes only, then dispatch
    `android-build` / `desktop-build` with `attach_tag=<tag>`; verify attached
    asset names (`huichuang_basic-v<version>-android.apk`, …).
