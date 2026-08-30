@@ -307,9 +307,9 @@ void main() {
     expect(top, greaterThan(0));
     expect(top + box.size.height, lessThan(380));
   });
-  testWidgets('HcLayout: landscape escapes the width thresholds',
+  testWidgets('HcLayout: M3 classes + landscape escape',
       (tester) async {
-    // (twoPane@1000, twoPane@900, extendedRail) per window size.
+    // (twoPane@600 default, twoPane@840 player, extendedRail) per size.
     final results = <(bool, bool, bool)>[];
     Future<void> probe(Size size) async {
       await tester.pumpWidget(MediaQuery(
@@ -318,7 +318,7 @@ void main() {
           builder: (context) {
             results.add((
               HcLayout.twoPane(context),
-              HcLayout.twoPane(context, minWidth: 900),
+              HcLayout.twoPane(context, minWidth: 840),
               HcLayout.extendedRail(context),
             ));
             return const SizedBox.shrink();
@@ -327,13 +327,15 @@ void main() {
       ));
     }
 
-    await probe(const Size(500, 900)); // portrait phone
+    await probe(const Size(430, 900)); // compact phone portrait
     expect(results.last, (false, false, false));
-    await probe(const Size(892, 412)); // landscape phone, sub-threshold
+    await probe(const Size(791, 820)); // fold inner portrait (~Pixel 9 Pro Fold)
+    expect(results.last, (true, false, false));
+    await probe(const Size(892, 412)); // phone landscape, sub-threshold
     expect(results.last, (true, true, false));
-    await probe(const Size(999, 1200)); // tall portrait, below 1000
-    expect(results.last, (false, true, false));
-    await probe(const Size(1000, 1200)); // portrait at the shell threshold
+    await probe(const Size(839, 1100)); // medium ceiling, portrait
+    expect(results.last, (true, false, false));
+    await probe(const Size(840, 1100)); // expanded, portrait
     expect(results.last, (true, true, false));
     await probe(const Size(1300, 800)); // desktop-class
     expect(results.last, (true, true, true));
@@ -343,6 +345,29 @@ void main() {
       (tester) async {
     _narrow(tester, size: const Size(892, 412));
     // Textbooks preloaded so no tab sits in an endless spinner.
+    final app =
+        await _app(tester, after: (app) => app.catalog.loadTextbooks());
+    final auth = AuthController(
+      store: TokenStore(MemoryKV()),
+      settings: await AppSettings.load(),
+      biometrics: FakeBiometricGate(),
+    );
+    await tester.pumpWidget(MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppController>.value(value: app),
+        ChangeNotifierProvider<AuthController>.value(value: auth),
+      ],
+      child: const MaterialApp(home: AppShell()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('shell: fold inner portrait uses the rail, not the bottom bar',
+      (tester) async {
+    _narrow(tester, size: const Size(791, 820));
     final app =
         await _app(tester, after: (app) => app.catalog.loadTextbooks());
     final auth = AuthController(
@@ -399,6 +424,25 @@ void main() {
 
     // Tapping a leaf fills the side pane in place — no route push, no
     // inline expansion (that is the narrow-tree contract instead).
+    await tester.tap(find.text('第一节 春晓'));
+    await tester.pumpAndSettle();
+    expect(find.text('春晓第一课'), findsOneWidget);
+    expect(find.text('春晓第二课'), findsOneWidget);
+  });
+
+  testWidgets('fold inner portrait courses: tree left, selected lessons right',
+      (tester) async {
+    // The reported bug: Pixel 9 Pro Fold inner screen (~791×820 logical)
+    // sat below the old desktop-only 1000 threshold and showed the
+    // one-column phone tree.
+    _narrow(tester, size: const Size(791, 820));
+    final app = await _app(tester,
+        after: (app) => app.openMaterial(_courseMaterial));
+    await tester.pumpWidget(_host(app, const CoursesPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(VerticalDivider), findsOneWidget);
+
     await tester.tap(find.text('第一节 春晓'));
     await tester.pumpAndSettle();
     expect(find.text('春晓第一课'), findsOneWidget);

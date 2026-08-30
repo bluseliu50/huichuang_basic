@@ -213,7 +213,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final wide = HcLayout.twoPane(context, minWidth: 900);
+    final wide = HcLayout.twoPane(context, minWidth: 840);
     final body = _loading
         ? const Center(child: CircularProgressIndicator())
         : _error != null
