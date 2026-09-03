@@ -132,23 +132,56 @@ WebviewWindow::WebviewWindow(FlMethodChannel *method_channel, int64_t window_id,
   box_ = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0));
   gtk_container_add(GTK_CONTAINER(window_), GTK_WIDGET(box_));
 
-  // initial flutter_view
-  g_autoptr(FlDartProject) project = fl_dart_project_new();
-  const char *args[] = {"web_view_title_bar", g_strdup_printf("%ld", window_id),
-                        nullptr};
-  fl_dart_project_set_dart_entrypoint_arguments(project,
-                                                const_cast<char **>(args));
-  auto *title_bar = fl_view_new(project);
-
-  g_autoptr(FlPluginRegistrar) desktop_webview_window_registrar =
-      fl_plugin_registry_get_registrar_for_plugin(FL_PLUGIN_REGISTRY(title_bar),
-                                                  "DesktopWebviewWindowPlugin");
-  client_message_channel_plugin_register_with_registrar(
-      desktop_webview_window_registrar);
-
-  gtk_widget_set_size_request(GTK_WIDGET(title_bar), -1, title_bar_height);
-  gtk_widget_set_vexpand(GTK_WIDGET(title_bar), FALSE);
-  gtk_box_pack_start(box_, GTK_WIDGET(title_bar), FALSE, FALSE, 0);
+  // Patched (hc4): the webview window must not host a second Flutter engine
+  // for its title bar on Linux. Any Flutter-engine teardown in this process
+  // destroys its EGL image through epoxy eglDestroyImageKHR, which resolves
+  // to NULL on NVIDIA EGL — epoxy aborts the whole process the moment the
+  // webview window closes (the crash right after login, SIGABRT + a
+  // WebKitWebProcess segfault in libnvidia-eglcore as a side casualty).
+  // Render the same back/forward/reload controls natively: zero GL, zero
+  // extra engines. macOS keeps the Flutter title bar (separate code path).
+  auto *nav_bar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_container_set_border_width(GTK_CONTAINER(nav_bar), 4);
+  back_button_ = gtk_button_new_from_icon_name("go-previous-symbolic",
+                                               GTK_ICON_SIZE_SMALL_TOOLBAR);
+  forward_button_ = gtk_button_new_from_icon_name(
+      "go-next-symbolic", GTK_ICON_SIZE_SMALL_TOOLBAR);
+  reload_button_ = gtk_button_new_from_icon_name(
+      "view-refresh-symbolic", GTK_ICON_SIZE_SMALL_TOOLBAR);
+  GtkWidget *title_bar = GTK_WIDGET(nav_bar);
+  for (auto *button : {back_button_, forward_button_, reload_button_}) {
+    gtk_button_set_relief(GTK_BUTTON(button), GTK_RELIEF_NONE);
+    gtk_widget_set_focus_on_click(button, FALSE);
+    gtk_widget_set_sensitive(button, FALSE);
+    gtk_box_pack_start(GTK_BOX(nav_bar), button, FALSE, FALSE, 0);
+  }
+  gtk_widget_set_sensitive(reload_button_, TRUE);
+  g_signal_connect(
+      back_button_, "clicked",
+      G_CALLBACK(+[](GtkButton *, gpointer user_data) {
+        static_cast<WebviewWindow *>(user_data)->GoBack();
+      }),
+      this);
+  g_signal_connect(
+      forward_button_, "clicked",
+      G_CALLBACK(+[](GtkButton *, gpointer user_data) {
+        static_cast<WebviewWindow *>(user_data)->GoForward();
+      }),
+      this);
+  g_signal_connect(
+      reload_button_, "clicked",
+      G_CALLBACK(+[](GtkButton *, gpointer user_data) {
+        auto *self = static_cast<WebviewWindow *>(user_data);
+        if (self->loading_) {
+          self->StopLoading();
+        } else {
+          self->Reload();
+        }
+      }),
+      this);
+  gtk_widget_set_size_request(title_bar, -1, title_bar_height);
+  gtk_widget_set_vexpand(title_bar, FALSE);
+  gtk_box_pack_start(box_, title_bar, FALSE, FALSE, 0);
 
   // initial web_view
   webview_ = webkit_web_view_new();
@@ -159,24 +192,24 @@ WebviewWindow::WebviewWindow(FlMethodChannel *method_channel, int64_t window_id,
                    G_CALLBACK(on_load_changed), this);
   g_signal_connect(G_OBJECT(webview_), "decide-policy",
                    G_CALLBACK(decide_policy_cb), this);
-
   auto settings = webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webview_));
   webkit_settings_set_javascript_can_open_windows_automatically(settings, true);
+  // Patched (hc3): force software rendering in the webview. With accelerated
+  // compositing on, WebKitWebProcess segfaults inside libnvidia-eglcore when
+  // the login window closes (verified via coredumps on driver 610.57.04) and
+  // its death corrupts shared EGL state in the app process. A login form
+  // does not need GL compositing.
+  webkit_settings_set_hardware_acceleration_policy(
+      settings, WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER);
   default_user_agent_ = webkit_settings_get_user_agent(settings);
   gtk_box_pack_end(box_, webview_, true, true, 0);
 
   gtk_widget_show_all(GTK_WIDGET(window_));
   gtk_widget_grab_focus(GTK_WIDGET(webview_));
 
-  // FROM: https://github.com/leanflutter/window_manager/pull/343
-  // Disconnect all delete-event handlers first in flutter 3.10.1, which causes
-  // delete_event not working. Issues from flutter/engine:
-  // https://github.com/flutter/engine/pull/40033
-  guint handler_id = g_signal_handler_find(window_, G_SIGNAL_MATCH_DATA, 0, 0,
-                                           NULL, NULL, title_bar);
-  if (handler_id > 0) {
-    g_signal_handler_disconnect(window_, handler_id);
-  }
+  // (hc4) The window_manager delete-event workaround that used to live here
+  // disconnected a handler registered by the Flutter title-bar FlView — no
+  // FlView is created anymore, so there is nothing to disconnect.
 }
 
 WebviewWindow::~WebviewWindow() {
@@ -220,6 +253,9 @@ void WebviewWindow::OnLoadChanged(WebKitLoadEvent load_event) {
     auto can_go_back = webkit_web_view_can_go_back(WEBKIT_WEB_VIEW(webview_));
     auto can_go_forward =
         webkit_web_view_can_go_forward(WEBKIT_WEB_VIEW(webview_));
+    // (hc4) keep the native nav bar in sync with the history state.
+    gtk_widget_set_sensitive(back_button_, can_go_back);
+    gtk_widget_set_sensitive(forward_button_, can_go_forward);
     auto *args = fl_value_new_map();
     fl_value_set(args, fl_value_new_string("id"), fl_value_new_int(window_id_));
     fl_value_set(args, fl_value_new_string("canGoBack"),
@@ -230,6 +266,25 @@ void WebviewWindow::OnLoadChanged(WebKitLoadEvent load_event) {
                                     "onHistoryChanged", args, nullptr, nullptr,
                                     nullptr);
   }
+
+  // (hc4) loading state drives the reload/stop button swap.
+  switch (load_event) {
+    case WEBKIT_LOAD_STARTED:
+    case WEBKIT_LOAD_COMMITTED:
+      loading_ = true;
+      break;
+    case WEBKIT_LOAD_FINISHED:
+      loading_ = false;
+      break;
+    default:
+      break;
+  }
+  gtk_button_set_image(
+      GTK_BUTTON(reload_button_),
+      gtk_image_new_from_icon_name(
+          loading_ ? "window-close-symbolic" : "view-refresh-symbolic",
+          GTK_ICON_SIZE_SMALL_TOOLBAR));
+
 
   // notify load start/finished event.
   switch (load_event) {

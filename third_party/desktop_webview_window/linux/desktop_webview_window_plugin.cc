@@ -7,6 +7,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <vector>
 
 #include "message_channel_plugin.h"
 #include "webview_window.h"
@@ -100,8 +101,21 @@ static void webview_window_plugin_handle_method_call(
     self->windows->at(window_id)->RunJavaScriptWhenContentReady(java_script);
     fl_method_call_respond_success(method_call, nullptr, nullptr);
   } else if (strcmp(method, "clearAll") == 0) {
+    // Patched (hc2): Close() runs the window's destroy handler synchronously
+    // (gtk_window_close -> gtk_widget_destroy), and that handler erases the
+    // window from this very map — iterating the map directly is a
+    // use-after-free that segfaults the app whenever clearAll runs with a
+    // live webview (the post-login profile reset). Snapshot the ids and
+    // re-lookup each entry; ones already erased are skipped.
+    std::vector<int64_t> ids;
     for (const auto &item : *self->windows) {
-      item.second->Close();
+      ids.push_back(item.first);
+    }
+    for (const auto id : ids) {
+      auto it = self->windows->find(id);
+      if (it != self->windows->end()) {
+        it->second->Close();
+      }
     }
     // If application didn't create a webview, but we called
     // webkit_website_data_manager_clear, there will be a segment fault. To

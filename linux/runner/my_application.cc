@@ -69,9 +69,12 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_default_size(window, 1280, 720);
 
   // Window/taskbar icon (data/icon.png installed by the CMake bundle rules).
+  // Set as the PROCESS-WIDE default so every toplevel inherits it — the main
+  // window AND the login webview window desktop_webview_window creates later
+  // (without this the taskbar shows the generic Wayland icon for it).
   gchar* icon_path = bundle_file_path("data/icon.png");
   if (icon_path != nullptr) {
-    gtk_window_set_icon_from_file(window, icon_path, nullptr);
+    gtk_window_set_default_icon_from_file(icon_path, nullptr);
     g_free(icon_path);
   }
 

@@ -72,6 +72,11 @@ class WebviewWindow {
   GtkWidget *window_ = nullptr;
   GtkWidget *webview_ = nullptr;
   GtkBox *box_ = nullptr;
+  // (hc4) native title bar buttons — replaces the second Flutter engine.
+  GtkWidget *back_button_ = nullptr;
+  GtkWidget *forward_button_ = nullptr;
+  GtkWidget *reload_button_ = nullptr;
+  bool loading_ = false;
 
   std::unordered_map<std::string, gulong> js_channel_handler_ids_;
 };
