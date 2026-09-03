@@ -293,4 +293,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ATTACH_TAG: ${{ github.event_name == 'release' && github.ref_name || inputs.attach_tag }}
-        run: gh release upload "$ATTACH_TAG" ${{ steps.dist.outputs.files }} --clobber
+        # bash for one syntax across runners. The windows-x64 job hit
+        # transient "release not found" 404s on tag->release lookup
+        # twice in a row (rc.2, rc.3) minutes after release creation,
+        # while mac/linux succeeded — retry the upload instead of
+        # failing a 10-minute build over it.
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do
+            gh release upload "$ATTACH_TAG" ${{ steps.dist.outputs.files }} --clobber && exit 0
+            echo "attach attempt $i failed; retrying in 20s" >&2
+            sleep 20
+          done
+          exit 1
