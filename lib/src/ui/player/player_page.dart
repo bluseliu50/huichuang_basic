@@ -111,10 +111,30 @@ class _PlayerPageState extends State<PlayerPage> {
       );
       final native = player.platform;
       if (native is NativePlayer) {
-        await native.setProperty('hwdec', 'auto-safe');
+        // Linux + NVIDIA: auto-safe resolves to nvdec, whose CUDA-GL
+        // interop segfaults libmpv inside cuGraphicsUnregisterResource on
+        // video_output_dispose (AppImage crash, coredump on driver
+        // 610.57.04). Copy modes still decode on the GPU but never
+        // register CUDA-GL interop resources. macOS (videotoolbox) and
+        // Windows (d3d11va) keep auto-safe.
+        await native.setProperty(
+          'hwdec',
+          Platform.isLinux ? 'auto-copy' : 'auto-safe',
+        );
         await native.setProperty('cache-pause', 'no');
       }
-      final controller = VideoController(player);
+      final controller = VideoController(
+        player,
+        configuration: VideoControllerConfiguration(
+          // Linux: Flutter's desktop renderer cannot composite media_kit's
+          // GL external texture (solid-blue video area; the GDK GL context
+          // mpv renders into is invisible to Impeller). Pixel-buffer
+          // (MPV_RENDER_API_TYPE_SW) textures upload like any other image
+          // and render on every backend; hwdec=auto-copy above still decodes
+          // on the GPU. Other platforms keep GPU compositing.
+          enableHardwareAcceleration: !Platform.isLinux,
+        ),
+      );
 
       debugPrint('PLAYER_OPEN url=${proxy.playlistUrl(widget.resId)}');
       player.stream.duration.listen((d) {
