@@ -253,33 +253,42 @@ jobs:
           # /usr/lib/x86_64-linux-gnu path: a bundled webkit can NEVER
           # find them, so creating the login webview died with a fatal
           # g_error (SIGTRAP) on every host but the build distro (rc.3
-          # Linux AppImage). Use the SYSTEM WebKitGTK instead: exclude it
-          # plus its dependency closure (glib / gstreamer / soup
-          # families), which must not shadow the host versions the
-          # system webkit resolves against — bundled-ubuntu-22.04 glib
-          # 2.72 broke system gstreamer/gio symbol lookups the same way.
-          # Hosts without webkit2gtk-4.1 lose the app entirely; every
-          # mainstream distro ships it. Verified: stripped bundle +
-          # system webkit survives webview construction and app startup.
-          webkit_system_excludes=""
-          for lib in \
-            libwebkit2gtk-4.1.so.0 libjavascriptcoregtk-4.1.so.0 \
-            libglib-2.0.so.0 libgio-2.0.so.0 libgobject-2.0.so.0 \
-            libgmodule-2.0.so.0 libsoup-3.0.so.0 libnghttp2.so.14 \
-            libgstreamer-1.0.so.0 libgstallocators-1.0.so.0 \
-            libgstapp-1.0.so.0 libgstaudio-1.0.so.0 libgstbase-1.0.so.0 \
-            libgstfft-1.0.so.0 libgstgl-1.0.so.0 libgstpbutils-1.0.so.0 \
-            libgsttag-1.0.so.0 libgstvideo-1.0.so.0 libgudev-1.0.so.0 \
-            libpcre2-8.so.0 libmount.so.1 libudev.so.1 libsystemd.so.0; do
-            webkit_system_excludes="$webkit_system_excludes --exclude-library $lib"
-          done
-          OUTPUT="huichuang_basic-v${APP_VERSION}-linux-x64.AppImage" \
-            ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+          # Linux AppImage). Use the SYSTEM WebKitGTK instead and strip
+          # it plus its dependency closure (glib / gstreamer / soup
+          # families) from the AppDir: they must not shadow the host
+          # versions the system webkit resolves against — bundled
+          # ubuntu-22.04 glib 2.72 broke system gstreamer/gio symbol
+          # lookups the same way. --exclude-library is NOT enough: the
+          # gtk plugin re-invokes linuxdeploy without our flags and
+          # deploys the closure anyway, so strip AFTER deployment, then
+          # build the AppImage with appimagetool ourselves. Hosts without
+          # webkit2gtk-4.1 lose the app entirely; every mainstream distro
+          # ships it. Verified: stripped bundle + system webkit survives
+          # webview construction and app startup.
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/huichuang_basic \
             --desktop-file packaging/linux/huichuang_basic.desktop \
             --icon-file huichuang_basic.png \
-            $webkit_system_excludes \
-            --plugin gtk --output appimage
+            --plugin gtk
+          rm -fv AppDir/usr/lib/libwebkit2gtk-4.1.so* \
+            AppDir/usr/lib/libjavascriptcoregtk-4.1.so* \
+            AppDir/usr/lib/libglib-2.0.so* \
+            AppDir/usr/lib/libgio-2.0.so* \
+            AppDir/usr/lib/libgobject-2.0.so* \
+            AppDir/usr/lib/libgmodule-2.0.so* \
+            AppDir/usr/lib/libgstreamer-1.0.so* \
+            AppDir/usr/lib/libgst*.so* \
+            AppDir/usr/lib/libgudev-1.0.so* \
+            AppDir/usr/lib/libsoup-3.0.so* \
+            AppDir/usr/lib/libnghttp2.so* \
+            AppDir/usr/lib/libpcre2-8.so* \
+            AppDir/usr/lib/libmount.so* \
+            AppDir/usr/lib/libudev.so* \
+            AppDir/usr/lib/libsystemd.so*
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir \
+            "huichuang_basic-v${APP_VERSION}-linux-x64.AppImage"
       - name: Package (Windows installer)
         if: runner.os == 'Windows'
         shell: pwsh
