@@ -377,20 +377,16 @@ FlValue *WebviewWindow::GetAllCookies() {
 
 gboolean WebviewWindow::DecidePolicy(WebKitPolicyDecision *decision,
                                      WebKitPolicyDecisionType type) {
-  if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
-    auto *navigation_decision = WEBKIT_NAVIGATION_POLICY_DECISION(decision);
-    auto *navigation_action =
-        webkit_navigation_policy_decision_get_navigation_action(
-            navigation_decision);
-    auto *request = webkit_navigation_action_get_request(navigation_action);
-    auto *uri = webkit_uri_request_get_uri(request);
-    auto *args = fl_value_new_map();
-    fl_value_set(args, fl_value_new_string("id"), fl_value_new_int(window_id_));
-    fl_value_set(args, fl_value_new_string("url"), fl_value_new_string(uri));
-    fl_method_channel_invoke_method(FL_METHOD_CHANNEL(method_channel_),
-                                    "onUrlRequested", args, nullptr, nullptr,
-                                    nullptr);
-  }
+  // Patched (hc6): no method-channel call from inside the decide-policy
+  // signal. Upstream invoked "onUrlRequested" on the Flutter engine from
+  // this WebKit signal handler on every navigation; on the AppImage build
+  // (bundled WebKitGTK from ubuntu-22.04) that cross-engine call at
+  // navigation time took the whole process down with SIGTRAP the moment
+  // the portal's 登录 click navigated (rc.3), while the same code ran
+  // fine against the system WebKitGTK 2.52 in dev builds. The
+  // notification only fed a cosmetic status string in this app — the
+  // token capture does not depend on it. Default policy (allow) is
+  // unchanged.
   return false;
 }
 

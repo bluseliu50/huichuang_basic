@@ -78,8 +78,13 @@ flutter:
 # window map while Close() erased from it under the loop (UAF after login);
 # hc3 — webview forced to software rendering, else WebKitWebProcess segfaults
 # in libnvidia-eglcore on close; hc4 — title bar is native GTK, not a second
-# Flutter engine, whose GL teardown aborts the process on NVIDIA EGL (the
-# "flash crash after login"). Drop the override once upstream ships fixes.
+# Flutter Engine, whose GL teardown aborts the process on NVIDIA EGL (the
+# "flash crash after login"); hc5 — Windows NavigationStarting is notify-only
+# (upstream's cancel→Dart-reply→re-navigate dance froze JS-initiated
+# navigations in the login webview); hc6 — Linux DecidePolicy no longer calls
+# the Flutter engine from the WebKit signal (SIGTRAP on the AppImage build's
+# bundled WebKitGTK when the login navigation started). Drop the override
+# once upstream ships fixes.
 #
 # Vendored from pub.dev flutter_inappwebview_android 1.1.3 with the AGP 9
 # proguard fix upstream already has on master (proguard-android.txt →

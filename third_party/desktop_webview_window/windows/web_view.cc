@@ -166,51 +166,32 @@ void WebView::OnWebviewControllerCreated() {
                      flutter::EncodableValue(web_view_id_)},
                 }));
 
+            // Patched (hc5): notify-only. Upstream cancels every
+            // navigation here (put_Cancel(true)), round-trips to Dart for
+            // a bool and re-navigates from the reply — a dance that loses
+            // JS-initiated navigations entirely when the reply path
+            // misbehaves: the login webview froze on the portal page on
+            // Windows (rc.3) — clicking 登录 did nothing, while the
+            // launch-time navigation (the same dance) worked. This app's
+            // URL callback is informational only (always returns true), so
+            // behave like the Linux/macOS implementations: never cancel,
+            // fire the onUrlRequested notification and let WebView2
+            // navigate natively.
             if (triggerOnUrlRequestedEvent) {
               wil::unique_cotaskmem_string uri;
               HRESULT hr = args->get_Uri(&uri);
-              if (FAILED(hr) || !uri) {
-                args->put_Cancel(true);
-                return S_OK;
+              if (SUCCEEDED(hr) && uri) {
+                method_channel_->InvokeMethod(
+                    "onUrlRequested",
+                    std::make_unique<flutter::EncodableValue>(
+                        flutter::EncodableMap{
+                            {flutter::EncodableValue("id"),
+                             flutter::EncodableValue(web_view_id_)},
+                            {flutter::EncodableValue("url"),
+                             flutter::EncodableValue(wide_to_utf8(
+                                 std::wstring(uri.get())))},
+                        }));
               }
-
-              // Capture URI string before async callback
-              std::wstring uri_string(uri.get());
-
-              auto result_handler =
-                  std::make_unique<flutter::MethodResultFunctions<>>(
-                      [uri_string, sender,
-                       this](const flutter::EncodableValue *success_value) {
-                        bool letPass = false;
-                        if (success_value && 
-                            std::holds_alternative<bool>(*success_value)) {
-                          letPass = std::get<bool>(*success_value);
-                        }
-                        if (letPass) {
-                          this->setTriggerOnUrlRequestedEvent(false);
-                          sender->Navigate(uri_string.c_str());
-                        }
-                      },
-                      nullptr, nullptr);
-
-              method_channel_->InvokeMethod(
-                  "onUrlRequested",
-                  std::make_unique<flutter::EncodableValue>(
-                      flutter::EncodableMap{
-                          {flutter::EncodableValue("id"),
-                           flutter::EncodableValue(web_view_id_)},
-                          {flutter::EncodableValue("url"),
-                           flutter::EncodableValue(
-                               wide_to_utf8(uri_string))},
-                      }),
-                  std::move(result_handler));
-
-              // navigation is canceled here and retriggered later from the
-              // callback passed to the method channel
-              args->put_Cancel(true);
-            } else {
-              args->put_Cancel(false);
-              triggerOnUrlRequestedEvent = true;
             }
             return S_OK;
           })

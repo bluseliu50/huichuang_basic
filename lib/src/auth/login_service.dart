@@ -25,6 +25,18 @@ const _tokenChannelName = 'hcTokenChannel';
 
 const _loginUrl = 'https://basic.smartedu.cn/';
 
+/// Direct entry to the platform's login page — the exact URL the portal's
+/// 登录 anchor lands on (verified 2026-09-03: single same-tab hop, no
+/// query params). The portal entry itself is a JS chain (Xuser-SDK token
+/// promise, then location.href) that never fires inside the Windows
+/// WebView2 login window (rc.3 stayed frozen on the portal), and the
+/// Linux AppImage build died on the click. Windows and Linux therefore
+/// skip the portal and land here directly; the injected script already
+/// handles this host (fill + submit), and after login the auth page
+/// redirects back to basic.smartedu.cn where the token lands in
+/// localStorage as usual. macOS keeps the proven portal entry.
+const _authLoginUrl = 'https://auth.smartedu.cn/uias/login';
+
 /// WebView2 resolves a relative [CreateConfiguration.userDataFolderWindows]
 /// next to the exe — read-only under Program Files, which makes the login
 /// webview die with "Edge cannot read or write its data directory". Point
@@ -250,7 +262,9 @@ class DesktopLoginService implements LoginService {
       done(const LoginResult(cancelled: true));
     }));
 
-    webview.launch(_loginUrl);
+    webview.launch(Platform.isWindows || Platform.isLinux
+        ? _authLoginUrl
+        : _loginUrl);
 
     // Dart-side token poll — fallback only: the primary capture is the
     // channel push above. evaluateJavaScript gets a hard timeout because
