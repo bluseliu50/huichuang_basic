@@ -357,11 +357,14 @@ jobs:
           # pacman package). The macOS zip sits at depth 6
           # (build/macos/Build/Products/Release); Windows/Linux land at
           # the repo root. Multiline output: every consumer word-splits.
-          dist=$(find build . -maxdepth 8 \( \
+          # One path arg only: `find build .` would match everything
+          # under build/ twice (macOS zip uploaded twice -> attach
+          # failure); sort -u is belt-and-braces.
+          dist=$(find . -maxdepth 8 \( \
             -name 'huichuang_basic-v*.zip' \
             -o -name 'huichuang_basic-v*.deb' \
             -o -name 'huichuang_basic-v*.pkg.tar.zst' \
-            -o -name 'huichuang_basic-v*-setup.exe' \) -print)
+            -o -name 'huichuang_basic-v*-setup.exe' \) -print | sort -u)
           {
             echo "files<<EOF_DIST"
             echo "$dist"
