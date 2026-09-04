@@ -1,10 +1,11 @@
 # Android build — release APK signed with the pinned release certificate.
 #
-# Manual dispatch ONLY (Actions → android-build → Run workflow). Nothing
-# triggers it automatically: per the desktop rule, expensive builds run
-# when you press the button. A published PRERELEASE never starts any CI;
-# to ship its APK, dispatch this workflow with attach_tag set to the
-# prerelease tag.
+# Manual dispatch (Actions → android-build → Run workflow), or a push to
+# main (merged PRs). A push whose commits are ALL docs-typed (docs: /
+# docs(...)) is skipped by the setup gate — the gate only ever SKIPS a
+# build, commit messages never start one. A published PRERELEASE never
+# starts any CI; to ship its APK, dispatch this workflow with attach_tag
+# set to the prerelease tag.
 #
 # Signing: the release keystore arrives via the KEYSTORE_BASE64 /
 # KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD repo secrets and is decoded
@@ -32,13 +33,39 @@ on:
         type: string
         default: ''
 
+  push:
+    branches: [main]
+
 
 concurrency:
   group: android-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Docs-only gate: skips the expensive build when every commit in the
+  # push is docs-typed. Skipped entirely on dispatch (build's `if` uses
+  # always() so that skip does not cascade).
+  setup:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.docs.outputs.skip }}
+    steps:
+      - id: docs
+        run: |
+          skip=$(jq -r '
+            if (.commits | length) == 0 then "false"
+            else
+              ([.commits[].message
+                | (startswith("docs:") or startswith("docs("))] | all)
+              | tostring
+            end' "$GITHUB_EVENT_PATH")
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: setup
+    if: always() && (github.event_name != 'push' || needs.setup.outputs.skip != 'true')
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
