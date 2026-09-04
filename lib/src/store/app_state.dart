@@ -115,6 +115,13 @@ class AppController extends ChangeNotifier {
   StreamProxy? proxy;
   SharedPreferences? _settings;
 
+  /// Runs on window close BEFORE the engine tears down (wired by the quit
+  /// arbiter in main.dart): the open page releases its native-backed
+  /// resources — the media_kit player (mpv render callbacks + registered
+  /// texture) or pdfium page loads — which abort the whole process when they
+  /// race the shutdown.
+  Future<void> Function()? activeTeardown;
+
   LoadPhase catalogPhase = LoadPhase.idle;
   String? catalogError;
   final Completer<void> _catalogLoadComplete = Completer<void>();
@@ -454,5 +461,17 @@ class AppController extends ChangeNotifier {
     _history = const [];
     await _settings?.remove('hc_watch_history');
     notifyListeners();
+  }
+
+  /// Quit path: release whatever the open page registered in
+  /// [activeTeardown]. Best-effort — a failing teardown must not block the
+  /// window from closing.
+  Future<void> teardownForQuit() async {
+    final teardown = activeTeardown;
+    activeTeardown = null;
+    if (teardown == null) return;
+    try {
+      await teardown();
+    } catch (_) {}
   }
 }

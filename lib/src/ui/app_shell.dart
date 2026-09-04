@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../auth/auth_controller.dart';
 import '../store/app_state.dart';
 import 'breakpoints.dart';
 import 'courses/courses_page.dart';
 import 'home/home_page.dart';
 import 'login/login_card.dart';
+import 'pdf/pdf_reader_page.dart';
 import 'pdf/textbooks_page.dart';
 import 'player/player_page.dart';
 import 'search/search_page.dart';
@@ -49,6 +51,32 @@ class _AppShellState extends State<AppShell> {
               builder: (_) => PlayerPage(resId: resid, title: 'E2E'),
             ),
           );
+        });
+      }
+      // E2E hook: HC_E2E_PDF=<bookId> opens that textbook's PDF reader once
+      // the catalog is ready (quit-arbiter verification, mirrors _open in
+      // textbooks_page).
+      final e2ePdf = Platform.environment['HC_E2E_PDF'];
+      if (e2ePdf != null) {
+        app.catalogLoadComplete.then((_) async {
+          if (!mounted) return;
+          final token = await context.read<AuthController>().ensureValidToken();
+          if (token == null || !mounted) return;
+          try {
+            final detail = await app.client.getTextbookDetail(e2ePdf);
+            final target =
+                detail.related.isNotEmpty ? detail.related.first : null;
+            if (target == null || target.storages.isEmpty) return;
+            if (!mounted) return;
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => PdfReaderPage(
+                  title: 'E2E',
+                  url: app.proxy!.fileUrl(target.storages.first),
+                ),
+              ),
+            );
+          } catch (_) {}
         });
       }
       // E2E hook: HC_E2E_TAB=<0-4> opens that shell tab once the catalog

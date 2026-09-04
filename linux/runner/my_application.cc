@@ -1,5 +1,7 @@
 #include "my_application.h"
 
+#include <unistd.h>
+
 #include <flutter_linux/flutter_linux.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
@@ -31,6 +33,13 @@ static gchar* bundle_file_path(const gchar* relative) {
   gchar* path = g_build_filename(dir, relative, nullptr);
   g_free(dir);
   return path;
+}
+
+// Quit the application when the main window goes away: window_manager's
+// close interception destroys the window but nothing else triggers the
+// GApplication shutdown, where my_application_shutdown ends the process.
+static void on_main_window_destroy(GtkWidget* widget, gpointer user_data) {
+  g_application_quit(G_APPLICATION(user_data));
 }
 
 // Implements GApplication::activate.
@@ -100,6 +109,9 @@ static void my_application_activate(GApplication* application) {
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
+
+  g_signal_connect(window, "destroy", G_CALLBACK(on_main_window_destroy),
+                   application);
 }
 
 // Implements GApplication::local_command_line.
@@ -134,11 +146,14 @@ static void my_application_startup(GApplication* application) {
 
 // Implements GApplication::shutdown.
 static void my_application_shutdown(GApplication* application) {
-  // MyApplication* self = MY_APPLICATION(object);
-
-  // Perform any actions required at application shutdown.
-
   G_APPLICATION_CLASS(my_application_parent_class)->shutdown(application);
+  // The engine is detached and every window is gone by the time shutdown
+  // runs. Returning into g_application_run would then walk the library
+  // atexit chain, where NVIDIA's EGL teardown SEGVs (driver 610.57.04,
+  // libnvidia-eglcore — same family as the WebKit crash hc7/hc8 fix) and
+  // DrKonqi pops a crash dialog over an already-dead, windowless process.
+  // End the process here instead; the kernel reclaims everything else.
+  _exit(0);
 }
 
 // Implements GObject::dispose.
