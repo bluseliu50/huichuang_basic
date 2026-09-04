@@ -62,7 +62,8 @@ commercial distribution.
 ## Architecture
 
 ```
-lib/main.dart                     — bootstrap: proxy startup, providers, E2E hooks
+lib/main.dart                     — bootstrap: proxy startup, providers, E2E hooks,
+                                    quit arbiter (deterministic window-close teardown)
 lib/src/api/                      — SmarteduClient (dual-mirror failover) + models
    └ catalog.dart                 — CatalogService (tag trees, materials, textbooks,
                                      module_version disk cache, local search)
@@ -274,6 +275,21 @@ debug builds, never upgrade-in-place over a release install.
   backup) — losing it means installed devices can never upgrade in place.
 - `package_info_plus` must stay `^10.0.0`: older majors pin `win32` ranges
   that conflict with `flutter_secure_storage_windows`' `win32 ^6`.
+- Linux window close goes through the quit arbiter (main.dart
+  `_QuitArbiter` + `window_manager` preventClose): the open page's
+  `activeTeardown` (media_kit player: stop → dispose, unregistering the
+  texture while the raster thread is idle) must run BEFORE the engine
+  tears down, and `my_application_shutdown` ends the process with
+  `_exit(0)` to skip the library atexit chain. Closing straight over a
+  live player/texture aborts three ways on NVIDIA driver 610.57.04
+  (engine texture-registrar `g_mutex_clear` abort, SEGV, Dart "Callback
+  invoked after it has been deleted" from mpv callbacks into a dead
+  isolate) and the EGL atexit teardown SEGVs even on a clean close —
+  DrKonqi turns every one into a fatal-error dialog (issue #9). Any new
+  page owning native-backed resources (player, pdfium renders) registers
+  itself in `AppController.activeTeardown`; do not remove the empty-looking
+  `_exit` or the preventClose wiring without re-verifying a full
+  play-then-close cycle produces zero coredumps.
 
 ## Commit convention (English only)
 
