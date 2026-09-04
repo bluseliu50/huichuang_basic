@@ -192,6 +192,16 @@ WebviewWindow::WebviewWindow(FlMethodChannel *method_channel, int64_t window_id,
   // webview construction. g_setenv with overwrite=FALSE keeps any
   // explicit user override in charge.
   g_setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", FALSE);
+  // (hc8) Even with compositing disabled (hc7), WebKitGTK >= 2.42 paints
+  // tiles through the DMABUF renderer, which initializes EGL inside the
+  // WebKitWebProcess. On NVIDIA proprietary drivers that process segfaults
+  // in libnvidia-eglcore when its contexts tear down (coredump: SEGV in
+  // WebKitWebProcess at window close, driver 610.57.04) - the web process
+  // death takes the shared buffers down mid-flight. Disabling the DMABUF
+  // renderer keeps every pixel in shared-memory buffers: zero EGL in the
+  // web process. Same env contract as hc7: read at web-process spawn,
+  // explicit user override wins.
+  g_setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", FALSE);
   webview_ = webkit_web_view_new();
   g_signal_connect(G_OBJECT(webview_), "load-failed-with-tls-errors",
                    G_CALLBACK(on_load_failed_with_tls_errors), this);
@@ -441,6 +451,7 @@ void WebviewWindow::EvaluateJavaScript(const char *java_script,
 }
 
 void WebviewWindow::RegisterJavaScriptChannel(const std::string &name) {
+    printf("WebviewWindow::RegisterJavaScriptChannel(%s)\n", name.c_str());
     WebKitUserContentManager *manager =
             webkit_web_view_get_user_content_manager(WEBKIT_WEB_VIEW(webview_));
 

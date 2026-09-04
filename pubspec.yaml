@@ -85,8 +85,13 @@ flutter:
 # the Flutter engine from the WebKit signal (SIGTRAP on the AppImage build's
 # bundled WebKitGTK when the login navigation started); hc7 — compositing mode
 # disabled via env before the web process spawns (hc3's settings policy alone
-# still left the login webview blank on NVIDIA). Drop the override
-# once upstream ships fixes.
+# still left the login webview blank on NVIDIA); hc8 — DMABUF renderer also
+# disabled via env: WebKitGTK ≥2.42 still initializes EGL in the WebKitWebProcess
+# for DMABUF tiles, and NVIDIA's driver segfaults that process on teardown
+# (coredump at window close, driver 610.57.04). Dart-side: the login token
+# watcher pushes from any *.smartedu.cn origin (WebKitGTK ≥2.46 only exposes
+# script handlers as window.webkit.messageHandlers.<name>; the post-login
+# redirect host varies). Drop the override once upstream ships fixes.
 #
 # Vendored from pub.dev flutter_inappwebview_android 1.1.3 with the AGP 9
 # proguard fix upstream already has on master (proguard-android.txt →

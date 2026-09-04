@@ -52,6 +52,10 @@ String get _webview2DataFolder {
 /// JS injected on every page load: on the portal (logged out) clicks the
 /// 登录 entry; on auth.smartedu.cn fills username/password, ticks the
 /// agreement and presses 登录. The slider captcha stays for the human.
+/// Independent of that flow, a token watcher polls localStorage on EVERY
+/// *.smartedu.cn document and pushes the token the moment it lands — the
+/// post-login redirect target under smartedu.cn varies, so the capture
+/// must not be tied to basic.smartedu.cn.
 String credentialInjection(String account, String password) {
   final acc = _jsEscape(account);
   final pass = _jsEscape(password);
@@ -67,38 +71,39 @@ String credentialInjection(String account, String password) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-  // Token push: WebKitGTK exposes the script message handler as
-  // window.<name>; WKWebView as window.webkit.messageHandlers.<name>.
+  // Token push: WebKitGTK >= 2.46 exposes the script message handler ONLY
+  // as window.webkit.messageHandlers.<name> (the legacy window.<name>
+  // object is gone — verified 2026-09-04 on webkit2gtk-4.1); WKWebView
+  // always uses the webkit.messageHandlers form. Try legacy first anyway.
   function __hcPush(v) {
     try {
       var ch = window['$_tokenChannelName'];
-      if (ch && ch.postMessage) { ch.postMessage(v); return; }
+      if (ch && ch.postMessage) { ch.postMessage(v); return true; }
       var wk = window.webkit && window.webkit.messageHandlers;
       var h = wk && wk['$_tokenChannelName'];
-      if (h && h.postMessage) h.postMessage(v);
+      if (h && h.postMessage) { h.postMessage(v); return true; }
+    } catch (e) {}
+    return false;
+  }
+  // Watcher: any smartedu.cn origin, first token wins. Runs independently
+  // of evaluateJavaScript, whose async callback never fires on some
+  // WebKitGTK builds.
+  function __hcWatch() {
+    try {
+      if (location.host.indexOf('.smartedu.cn') < 0 &&
+          location.host !== 'smartedu.cn') return;
+      var v = localStorage.getItem(KEY);
+      if (v && v.length > 50 && __hcPush(v)) clearInterval(window.__hcTok);
     } catch (e) {}
   }
+  __hcWatch();
+  window.__hcTok = setInterval(__hcWatch, 500);
   var tries = 0;
   var timer = setInterval(function () {
     tries++;
     try {
       var host = location.host;
       if (host === 'basic.smartedu.cn') {
-        var existing = localStorage.getItem(KEY);
-        if (existing && existing.length > 50) {
-          clearInterval(timer);
-          __hcPush(existing);
-          return;
-        }
-        // Keep pushing until the portal writes the token after login —
-        // independent of evaluateJavaScript, whose async callback never
-        // fires on some WebKitGTK builds.
-        var t2 = setInterval(function () {
-          try {
-            var v = localStorage.getItem(KEY);
-            if (v && v.length > 50) { clearInterval(t2); __hcPush(v); }
-          } catch (e) {}
-        }, 500);
         var links = Array.prototype.slice.call(document.querySelectorAll('a'))
           .filter(function (a) { return (a.textContent || '').trim() === '登录'; });
         if (links.length) { clearInterval(timer); links[0].click(); }
