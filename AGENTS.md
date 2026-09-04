@@ -70,6 +70,8 @@ lib/src/stream/proxy.dart         — 127.0.0.1 auth-injecting HLS/PDF proxy (li
    └ key_vault.dart               — HLS key dance: md5 sign + AES-128-ECB unwrap
 lib/src/auth/                     — AuthController (silent refresh), webview login
    └ token_store.dart, biometric.dart
+   └ login_service.dart           — injected credential script + token capture
+                                     (all-host watcher, three-path push)
 lib/src/store/app_state.dart      — AppController: selection, chapters, history
 lib/src/ui/                       — app_shell (adaptive rail/bottom bar), courses,
                                      player (media_kit + custom controls), pdf,
@@ -77,16 +79,25 @@ lib/src/ui/                       — app_shell (adaptive rail/bottom bar), cour
    └ breakpoints.dart             — HcLayout: shared M3 window-size-class rules
                                      (every responsive decision goes through it)
 tool/live_check.dart              — real-platform end-to-end proxy verification
+tool/webchannel_probe.dart        — login webview capture + close pipeline
+                                    probe (neutral page, no real site)
 test/                             — unit tests with byte-level real fixtures
 third_party/pdfrx                 — vendored pdfrx 2.4.8: createImage
                                     BGRA→RGBA fix + neighbor-page prerender
                                     (wired via dependency_overrides)
+third_party/desktop_webview_window — vendored 0.3.0+hc7 (dependency_overrides):
+                                    login-window fixes hc1–hc8; full list in
+                                    the root pubspec.yaml comment
 ```
 
 Data flow: UI → AppController → SmarteduClient (public static JSON on
 `s-file-{1,2}.ykt.cbern.com.cn`) ; playback → StreamProxy rewrites the playlist
 and injects `X-ND-AUTH`, performs the key dance, and fails over
 r1→r2→r3 nodes; media_kit (mpv) plays the proxied URL.
+Login (desktop): DesktopLoginService injects `credentialInjection` into the
+login webview; the injected watcher polls localStorage on EVERY
+`*.smartedu.cn` document and pushes the token via legacy `window[name]` →
+`window.webkit.messageHandlers` → `window.chrome.webview` (WebView2).
 
 ## Build & test
 
@@ -105,6 +116,8 @@ HC_TOKEN=<access_token> fvm dart run tool/live_check.dart   # live proxy proof
 Verification bar for merging "done" work: `flutter analyze` clean + tests green;
 any proxy / player / auth change additionally requires a `live_check` PASS or a
 macOS E2E log containing `PLAYER_OPEN` and `PLAYER_DURATION <n>s`.
+Login-webview changes additionally require a `tool/webchannel_probe.dart`
+PASS: `push received` + `close ok`, exit 0, no coredump.
 
 macOS E2E: `HC_E2E_TOKEN='<full token json>' HC_E2E_RESID=<resId> <debug binary>`.
 
@@ -128,15 +141,19 @@ signatures with `apksigner verify --print-certs` — `keytool -printcert
 
 `.github/workflows/desktop.yml` builds release bundles for macOS (arm64),
 Linux (x64) and Windows (x64) and attaches them to the published release.
-It runs ONLY on:
+It runs on:
 
 1. Manual dispatch: Actions → desktop-build → Run workflow.
-2. `release: published`.
+2. `release: published` (stable releases; prereleases no-op, see below).
+3. Push to `main` — i.e. squash-merged PRs under the PR discipline — EXCEPT
+   docs-only pushes: when EVERY commit message in the push is typed
+   `docs:` / `docs(...)` the setup gate empties the matrix and the run
+   no-ops in seconds (same mechanism as the prerelease gate).
 
-Deliberately no push/commit-message triggers — a three-platform build is
-expensive, and commit-message CI ("编译测试" magic strings) invites junk
-pushes just to kick builds. If a build is wanted, press the button or
-publish the release.
+Commit messages never START a build — the docs gate only ever SKIPS one
+("编译测试" kick pushes stay banned). All four platforms follow this
+policy: `android.yml` gates identically (setup job + `always()`-guarded
+build `if`).
 
 Stable releases auto-build; **prereleases do not** — `desktop.yml` opens with
 a setup gate whose matrix stays empty for `release: published` events marked
@@ -156,9 +173,14 @@ prerelease. Ship a prerelease by dispatching manually with `attach_tag`.
   `linux/runner/my_application.cc`. Keep all three in sync with the icon
   master (`assets/icon.png` is the single source for every platform).
 - Release assets are installers, not raw build trees: Windows Inno Setup
-  `.exe` (`packaging/windows/installer.iss`), Linux AppImage (linuxdeploy +
-  gtk plugin, desktop entry in `packaging/linux/`), macOS zip containing
-  the `.app` beside an `/Applications` symlink for drag-install.
+  `.exe` (`packaging/windows/installer.iss`), Linux deb (built on
+  ubuntu-24.04 so the deb's libmpv soname 2 resolves on Arch / Debian 12+ /
+  Fedora hosts) + pacman `.pkg.tar.zst` (real `makepkg` as a non-root
+  builder inside an `archlinux:base` container; pkgver drops the `-` so
+  prereleases vercmp-sort before the final release; nothing published to
+  the AUR or any pacman repo; desktop entry in `packaging/linux/`), macOS
+  zip containing the `.app` beside an `/Applications` symlink for
+  drag-install.
 - Auth on hosts WITHOUT secure storage (Linux without a Secret Service):
   the token falls back to an XOR-obfuscated file cache
   (`TokenFileCache`, `~/.config/huichuang_basic/session.bin`) so the login
@@ -167,7 +189,8 @@ prerelease. Ship a prerelease by dispatching manually with `attach_tag`.
 
 ### Android (android.yml)
 
-Manual dispatch only. Inputs: `abi` (`universal` or `split-per-abi`) and
+Manual dispatch, or push to `main` (docs-only pushes skip via the same
+gate as desktop.yml). Inputs: `abi` (`universal` or `split-per-abi`) and
 `attach_tag`. The release keystore is decoded from the `KEYSTORE_BASE64`
 secret (+ `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`) and gradle
 selects the release signing config purely by `HC_KEYSTORE_PATH` being set —
@@ -177,6 +200,12 @@ the pubspec version: `huichuang_basic-v<version>-android.apk` (universal) or
 `flutter-action`'s `channel: beta`; the stable default fails. Dispatch by
 file name (`gh workflow run android.yml`) — the display name can stop
 resolving after old runs are deleted.
+When the `KEYSTORE_BASE64` secret is absent entirely (mirror repos, manual
+test builds) the restore step exits 0 and `HC_KEYSTORE_PATH` is exported
+inside the run script only when the keystore file exists — gradle reads the
+env var with a non-null check, so an empty-string value would still read as
+"set" and break the debug fallback. Debug-signed APKs install only beside
+debug builds, never upgrade-in-place over a release install.
 - Debug/profile builds carry `.debug` / `.profile` `applicationIdSuffix` so
   they install BESIDE the release app — same applicationId with different
   signing keys fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, and the only
@@ -216,6 +245,29 @@ resolving after old runs are deleted.
   `createImage` must keep the BGRA→RGBA swap and the neighbor-page prerender
   must stay parallel-safe; regenerating or re-pointing the override loses
   both fixes.
+- Login token capture (`lib/src/auth/login_service.dart`): WebKitGTK ≥ 2.46
+  exposes script message handlers ONLY as `window.webkit.messageHandlers.<name>`
+  (the legacy `window.<name>` object is gone — probed on webkit2gtk-4.1);
+  the injected watcher therefore polls localStorage on EVERY `*.smartedu.cn`
+  document (the post-login redirect host varies) and pushes through three
+  guarded paths — legacy `window[name]`, `window.webkit.messageHandlers`,
+  `window.chrome.webview`. Windows receives via
+  `addOnWebMessageReceivedCallback` because upstream
+  `registerJavaScriptMessageHandler` returns early there — do not fold the
+  paths back into one. Windows/Linux enter `https://auth.smartedu.cn/uias/login`
+  directly (the portal's JS entry chain never fires inside WebView2);
+  macOS keeps the portal entry.
+- The vendored `third_party/desktop_webview_window` (0.3.0+hc7) carries
+  login-window fixes hc1–hc8 — regenerating or re-pointing the override
+  loses them, same contract as pdfrx. hc7/hc8 set
+  `WEBKIT_DISABLE_COMPOSITING_MODE` and `WEBKIT_DISABLE_DMABUF_RENDERER`
+  via `g_setenv(..., FALSE)` BEFORE `webkit_web_view_new()`: NVIDIA drivers
+  SEGV the WebKitWebProcess in EGL teardown on close, the env vars are read
+  at web-process spawn, and overwrite must stay FALSE so an explicit user
+  override keeps winning. hc5 makes Windows `NavigationStarting` notify-only
+  (the upstream cancel→Dart-reply→re-navigate dance loses JS-initiated
+  navigations); hc6 keeps `DecidePolicy` from calling the Flutter engine
+  inside the WebKit signal (SIGTRAP with bundled WebKitGTK).
 - Android release signing hinges on `HC_KEYSTORE_PATH`: set in CI to the
   pinned keystore, absent for local runs (debug signing). The keystore lives
   outside the repo (`~/.android/huichuang-release.keystore` + off-repo

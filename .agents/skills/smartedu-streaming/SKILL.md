@@ -82,6 +82,11 @@ performs the key dance in-process, and fails over r1→r2→r3 with retries.
   = `{"value": "<json>", "expire": ...}`. Inner json fields used:
   `access_token`, `refresh_token`, `expires_at`, `user_id`, `mac_key`.
   Slider captcha must be completed by the human user.
+  Direct login URL: `https://auth.smartedu.cn/uias/login` (single same-tab
+  hop, no query params — verified 2026-09-03). The portal front page enters
+  login via a JS chain (Xuser-SDK token promise, then `location.href`) that
+  does not fire inside WebView2, so desktop clients land on this URL
+  directly.
 - Refresh (verified 201, no auth header; **rotates refresh_token**, ~7-day
   rolling validity):
   `POST https://uc-gateway.ykt.eduyun.cn/v1.1/tokens/{refresh_token}/actions/refresh`
