@@ -303,12 +303,14 @@ jobs:
           sed "s/PLACEHOLDER_VERSION/$PKGVER/" packaging/arch/PKGBUILD \
             > pkgbuild/PKGBUILD
           cp -r "$STAGE" pkgbuild/stage
-          docker run --rm -v "$PWD:/work" -w /work/pkgbuild archlinux:base \
+          docker run --rm -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD:/work" -w /work/pkgbuild archlinux:base \
             bash -ec '
               pacman -Sy --noconfirm base-devel >/dev/null
               useradd -m builder
               chown -R builder:builder /work/pkgbuild
               su builder -s /bin/bash -c "cd /work/pkgbuild && makepkg --nodeps --noconfirm -f"
+              chown -R "$HOST_UID:$HOST_GID" /work/pkgbuild
             '
           mv pkgbuild/huichuang-basic-*.pkg.tar.zst \
             "huichuang_basic-v${APP_VERSION}-x86_64.pkg.tar.zst"
