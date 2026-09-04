@@ -2,12 +2,12 @@
 
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](LICENSE)
 
-国家中小学智慧教育平台（basic.smartedu.cn）的**非官方**第三方客户端，基于 Flutter 构建，覆盖 macOS / Windows / Linux / Android / iOS。
+国家中小学智慧教育平台（basic.smartedu.cn）的**非官方**第三方客户端，基于 Flutter 构建，覆盖 macOS / Windows / Linux / Android / iOS（等待好心人提供证书）。
 
 ## ✨ 功能
 
 - **课程教学**：学段 → 年级 → 学科 → 版本 → 册次 → 新旧教材 六级目录浏览，章节树 + 课时列表
-- **视频播放**：基于 mpv（media_kit）的原生管线播放加密 HLS。本地鉴权代理注入令牌、协商密钥，CDN 节点故障时自动切换——解决官方网页端"视频打不开"的老大难问题
+- **视频播放**：基于 mpv（media_kit）的原生管线播放加密 HLS。本地鉴权代理注入令牌、协商密钥，CDN 节点故障时自动切换，官方网页播放偶尔会（或者部分设备稳定的）打不开视频，本软件可以打开。
   - 桌面级播放控件：进度/缓冲条、±10s、倍速、音量、全屏、键盘快捷键（空格/K/←→/↑↓/F/M/Esc）、触摸手势（双击全屏、横拖快进、竖拖音量）
   - 断点续播：观看进度自动记录，超过 30s 的课时打开即续播
   - 多课时课程自动拆分为课时列表：旧教材按 bkks 标签，新教材（无标签）按资源排列顺序推导；课内点击即切换，无需返回目录。单课时课程同样以课时列表呈现（条目即课程本身）
@@ -33,11 +33,11 @@ fvm flutter run -d macos    # 或 -d windows / -d linux / android / ios
 
 | 平台 | 构建命令 | 验证状态 |
 |---|---|---|
-| macOS | `flutter build macos` | ✅ 已实测（播放 / PDF / 登录链路） |
-| Android | `flutter build apk --release` | ✅ 已构建 |
-| iOS | `flutter build ios --no-codesign` | ✅ 已编译（无真机验证） |
-| Windows | `flutter build windows` | ⚠️ 仅代码路径审查，未在 Windows 实机验证 |
-| Linux | `flutter build linux` | ⚠️ 仅代码路径审查，未在 Linux 实机验证 |
+| macOS | `flutter build macos` | 已实测 |
+| Android | `flutter build apk --release` | 已实测 |
+| iOS | `flutter build ios --no-codesign` | 等待好心人 |
+| Windows | `flutter build windows` | 已实测 |
+| Linux | `flutter build linux` | 已实测Arch Linux打包版本 |
 
 ### macOS 说明
 
@@ -49,14 +49,21 @@ fvm flutter run -d macos    # 或 -d windows / -d linux / android / ios
 - 生物识别需要设备支持（无指纹/Face 的设备自动隐藏该开关）。
 - minSdk 24（Android 7.0）以上。
 
-### 桌面端自动构建（CI）
+### 自动构建（CI）
 
-仓库提供 GitHub Actions 工作流 `desktop-build`，产出三平台 Release 压缩包（macOS arm64 / Linux x64 / Windows x64，文件名含版本号）：
+仓库提供两条 GitHub Actions 工作流，推送合并进 `main` 后自动出全平台产物：
 
-- **手动触发**：仓库页 Actions → desktop-build → Run workflow（产物在本次 run 的 Artifacts 里下载）。
-- **发布 Release 时触发**：压缩包自动挂到该 Release 的 Assets 下。
-- 不会随 push / commit 自动运行——三平台全量构建开销大，按钮即用。
-- 注意：CI 的 macOS 产物为 ad-hoc 签名（可正常打开），但 Keychain 条目不跨签名身份保留；如需凭据保险库长期可靠，请按上文本地签名构建。
+- **desktop-build**：macOS arm64（zip）/ Linux x64（deb + pacman）/ Windows x64（安装向导 exe），文件名含版本号
+- **android-build**：Android APK（universal，可选拆分 ABI）
+
+触发方式（两者一致）：
+
+- **push 到 main**：每次合入自动构建（仅 `docs:` 类提交的推送跳过，省机器）
+- **发布正式 Release**：产物自动挂到该 Release 的 Assets 下
+- **手动触发**：Actions → 对应工作流 → Run workflow（可指定附加到哪个 tag）
+- Prerelease 不会自动触发任何构建，需要时手动 dispatch 并填 `attach_tag`
+
+注意：CI 的 macOS 产物为 ad-hoc 签名（可正常打开），但 Keychain 条目不跨签名身份保留；如需凭据保险库长期可靠，请按上文本地签名构建。
 
 ## ⚖️ 法律风险规避（务必阅读）
 
