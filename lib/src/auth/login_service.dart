@@ -82,6 +82,8 @@ String credentialInjection(String account, String password) {
       var wk = window.webkit && window.webkit.messageHandlers;
       var h = wk && wk['$_tokenChannelName'];
       if (h && h.postMessage) { h.postMessage(v); return true; }
+      var cv = window.chrome && window.chrome.webview;
+      if (cv && cv.postMessage) { cv.postMessage(v); return true; }
     } catch (e) {}
     return false;
   }
@@ -230,11 +232,14 @@ class DesktopLoginService implements LoginService {
       } catch (_) {}
     }
 
-    // Channel push path (Linux/macOS): the injected script posts the
-    // token as soon as the portal writes it — no evaluate round-trip,
-    // which can hang forever on WebKitGTK builds whose async JS
-    // callbacks die mid-login (GLib criticals in WebKitWebProcess).
-    webview.registerJavaScriptMessageHandler(_tokenChannelName, (_, body) {
+    // Channel push path: the injected script posts the token as soon as
+    // the portal writes it — no evaluate round-trip, which can hang
+    // forever on WebKitGTK builds whose async JS callbacks die mid-login
+    // (GLib criticals in WebKitWebProcess). All three platforms push
+    // through __hcPush; the receiving end differs: WebView2 (Windows) has
+    // no named script channels, messages arrive via
+    // window.chrome.webview.postMessage as plain "onWebMessageReceived".
+    void handleTokenPush(dynamic body) {
       debugPrint(
           'HC_LOGIN token push received (${body is String ? body.length : body})');
       final value = body is String &&
@@ -251,7 +256,16 @@ class DesktopLoginService implements LoginService {
       } catch (e) {
         debugPrint('HC_LOGIN pushed token failed to parse: $e');
       }
-    });
+    }
+
+    if (Platform.isWindows) {
+      webview.addOnWebMessageReceivedCallback(handleTokenPush);
+    } else {
+      webview.registerJavaScriptMessageHandler(_tokenChannelName,
+          (_, body) {
+        handleTokenPush(body);
+      });
+    }
 
     webview.setOnUrlRequestCallback((url) {
       if (url.contains('basic.smartedu.cn')) {
@@ -275,7 +289,7 @@ class DesktopLoginService implements LoginService {
     // channel push above. evaluateJavaScript gets a hard timeout because
     // on some WebKitGTK builds its async callback never fires mid-login
     // and an unanswered invoke would hang this loop forever.
-    for (var i = 0; i < 300 && !finished; i++) {
+    for (var i = 0; i < 600 && !finished; i++) {
       await Future<void>.delayed(const Duration(seconds: 1));
       if (finished) break;
       try {
