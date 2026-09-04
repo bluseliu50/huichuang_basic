@@ -34,8 +34,9 @@ Future<void> main(List<String> args) async {
     print('HC_PROBE2 push received: $body');
     if (!push.isCompleted) push.complete(body?.toString());
   });
-  // Same dual-path push as the login flow's __hcPush: legacy window.<name>
-  // first, then the WKWebView-style window.webkit.messageHandlers.<name>.
+  // Same push order as the login flow's __hcPush, minus its third
+  // (Windows-only window.chrome.webview) path: legacy window.<name> first,
+  // then the WKWebView-style window.webkit.messageHandlers.<name>.
   webview.addScriptToExecuteOnDocumentCreated('''
 (function () {
   function push(v) {

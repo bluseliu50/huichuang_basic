@@ -451,7 +451,6 @@ void WebviewWindow::EvaluateJavaScript(const char *java_script,
 }
 
 void WebviewWindow::RegisterJavaScriptChannel(const std::string &name) {
-    printf("WebviewWindow::RegisterJavaScriptChannel(%s)\n", name.c_str());
     WebKitUserContentManager *manager =
             webkit_web_view_get_user_content_manager(WEBKIT_WEB_VIEW(webview_));
 

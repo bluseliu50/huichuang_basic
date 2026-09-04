@@ -1,7 +1,7 @@
 # Consumed by .github/workflows/desktop.yml (arch-x64 job). The workflow
-# seds PLACEHOLDER_VERSION from pubspec (with '-' -> '~' so pre-releases
-# sort before the final release) and stages the built Flutter bundle next
-# to this file as ./stage; makepkg assembles the pacman package from it.
+# seds PLACEHOLDER_VERSION from pubspec (the '-' is dropped, so pre-releases
+# vercmp-sort before the final release) and stages the built Flutter bundle
+# next to this file as ./stage; makepkg assembles the pacman package from it.
 pkgname=huichuang-basic
 pkgver=PLACEHOLDER_VERSION
 pkgrel=1
