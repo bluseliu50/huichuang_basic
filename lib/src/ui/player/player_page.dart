@@ -51,6 +51,7 @@ class _PlayerPageState extends State<PlayerPage> {
   StreamSubscription<String>? _errorSub;
   Duration _lastRecorded = Duration.zero;
   bool _recorded = false;
+  Future<void>? _disposeJob;
   bool get _isDesktop =>
       Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 
@@ -162,6 +163,9 @@ class _PlayerPageState extends State<PlayerPage> {
         _period = period;
         _loading = false;
       });
+      // Quit arbiter (main.dart): this page owns the live mpv player and
+      // its registered texture until the route pops.
+      appController.activeTeardown = _disposeActivePlayer;
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -223,12 +227,32 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   void dispose() {
-    _record();
+    unawaited(_disposeActivePlayer());
     _positionSub?.cancel();
     _completedSub?.cancel();
     _errorSub?.cancel();
     _player?.dispose();
     super.dispose();
+  }
+
+  /// Deterministic player teardown shared by route pop, retry-reload and
+  /// the quit arbiter: stop() first so mpv render callbacks cease, then
+  /// dispose() which unregisters the texture. Concurrent callers join one
+  /// in-flight job instead of disposing twice.
+  Future<void> _disposeActivePlayer() {
+    final inFlight = _disposeJob;
+    if (inFlight != null) return inFlight;
+    final player = _player;
+    if (player == null) return Future.value();
+    _player = null;
+    return _disposeJob = () async {
+      try {
+        await player.stop();
+      } catch (_) {}
+      try {
+        await player.dispose();
+      } catch (_) {}
+    }().whenComplete(() => _disposeJob = null);
   }
 
   @override
@@ -244,8 +268,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 _error = null;
                 _loading = true;
               });
-              _player?.dispose();
-              _player = null;
+              unawaited(_disposeActivePlayer());
               _load();
             },
           )

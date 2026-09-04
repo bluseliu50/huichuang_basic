@@ -76,6 +76,7 @@ Future<void> main(List<String> args) async {
 
   // Never let window setup abort startup: without it the app renders but the
   // process dies before runApp on hosts where the channel misbehaves.
+  var windowManagerReady = false;
   try {
     if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
       await windowManager.ensureInitialized();
@@ -89,6 +90,7 @@ Future<void> main(List<String> args) async {
           await windowManager.show();
         },
       );
+      windowManagerReady = true;
     }
   } catch (e) {
     debugPrint('window_manager unavailable, using platform defaults: $e');
@@ -102,6 +104,17 @@ Future<void> main(List<String> args) async {
     ),
     client: client,
   );
+
+  // Intercept the close button: release native-backed resources (mpv player
+  // + texture, pdf page renders) BEFORE the engine tears down. Closing
+  // straight over them aborts the process mid-teardown (g_mutex_clear
+  // abort / NVIDIA SEGV / "Callback invoked after it has been deleted" —
+  // all reproduced on Linux rc.4).
+  if (windowManagerReady) {
+    await windowManager.setPreventClose(true);
+    windowManager.addListener(_QuitArbiter(app));
+    debugPrint('HC_QUIT arbiter armed');
+  }
 
   // E2E hook: HC_E2E_RESID=<resId> auto-opens that lesson's player.
   final e2eResId = Platform.environment['HC_E2E_RESID'];
@@ -192,5 +205,29 @@ class HuichuangApp extends StatelessWidget {
       ),
       splashFactory: InkSparkle.splashFactory,
     );
+  }
+}
+
+/// Window-close interception: runs [AppController.teardownForQuit] (player,
+/// pdf release) and only then destroys the window, so mpv render callbacks
+/// and live textures never race the engine teardown.
+class _QuitArbiter with WindowListener {
+  _QuitArbiter(this._app);
+
+  final AppController _app;
+  bool _closing = false;
+
+  @override
+  void onWindowClose() async {
+    if (_closing) return;
+    _closing = true;
+    try {
+      await _app.teardownForQuit();
+      // One beat for the raster thread to drain any in-flight texture
+      // sample before the window goes away.
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    } finally {
+      await windowManager.destroy();
+    }
   }
 }
