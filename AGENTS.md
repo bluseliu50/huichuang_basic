@@ -190,10 +190,13 @@ prerelease. Ship a prerelease by dispatching manually with `attach_tag`.
 
 ### Android (android.yml)
 
-Manual dispatch, or push to `main` (docs-only pushes skip via the same
-gate as desktop.yml). Inputs: `abi` (`universal` or `split-per-abi`) and
-`attach_tag`. The release keystore is decoded from the `KEYSTORE_BASE64`
-secret (+ `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD`) and gradle
+Manual dispatch, push to `main` (docs-only pushes skip via the same gate
+as desktop.yml), or a **stable** release — `release: published` builds
+and attaches the APK automatically; prereleases never start CI here, ship
+them by dispatching with `attach_tag`. Inputs: `abi` (`universal` or
+`split-per-abi`) and `attach_tag`. The release keystore is decoded from
+the `KEYSTORE_BASE64` secret (+ `KEYSTORE_PASSWORD` / `KEY_ALIAS` /
+`KEY_PASSWORD`) and gradle
 selects the release signing config purely by `HC_KEYSTORE_PATH` being set —
 unset locally, builds fall back to the debug keystore. APK names derive from
 the pubspec version: `huichuang_basic-v<version>-android.apk` (universal) or

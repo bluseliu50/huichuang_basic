@@ -1,11 +1,12 @@
 # Android build — release APK signed with the pinned release certificate.
 #
-# Manual dispatch (Actions → android-build → Run workflow), or a push to
-# main (merged PRs). A push whose commits are ALL docs-typed (docs: /
-# docs(...)) is skipped by the setup gate — the gate only ever SKIPS a
-# build, commit messages never start one. A published PRERELEASE never
-# starts any CI; to ship its APK, dispatch this workflow with attach_tag
-# set to the prerelease tag.
+# Manual dispatch (Actions → android-build → Run workflow), a push to
+# main (merged PRs), or a STABLE release (builds and attaches the APK
+# automatically — prereleases never start CI here, ship those by
+# dispatching with attach_tag set to the prerelease tag). A push whose
+# commits are ALL docs-typed (docs: / docs() is skipped by the setup
+# gate — the gate only ever SKIPS a build, commit messages never start
+# one.
 #
 # Signing: the release keystore arrives via the KEYSTORE_BASE64 /
 # KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD repo secrets and is decoded
@@ -36,6 +37,11 @@ on:
   push:
     branches: [main]
 
+  # Stable releases build and attach automatically (github.ref_name is the
+  # tag). Prereleases never start CI here — ship them via dispatch with
+  # attach_tag, mirroring the desktop.yml prerelease gate.
+  release:
+    types: [published]
 
 concurrency:
   group: android-${{ github.ref }}
@@ -65,7 +71,9 @@ jobs:
 
   build:
     needs: setup
-    if: always() && (github.event_name != 'push' || needs.setup.outputs.skip != 'true')
+    if: always()
+      && (github.event_name != 'release' || !github.event.release.prerelease)
+      && (github.event_name != 'push' || needs.setup.outputs.skip != 'true')
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
@@ -160,9 +168,9 @@ jobs:
           if-no-files-found: error
 
       - name: Attach to release
-        if: inputs.attach_tag != ''
+        if: github.event_name == 'release' || inputs.attach_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          ATTACH_TAG: ${{ inputs.attach_tag }}
+          ATTACH_TAG: ${{ github.event_name == 'release' && github.ref_name || inputs.attach_tag }}
           FILES: ${{ steps.dist.outputs.files }}
         run: gh release upload "$ATTACH_TAG" $(echo "$FILES" | xargs) --clobber
