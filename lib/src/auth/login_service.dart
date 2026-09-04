@@ -25,6 +25,18 @@ const _tokenChannelName = 'hcTokenChannel';
 
 const _loginUrl = 'https://basic.smartedu.cn/';
 
+/// Direct entry to the platform's login page — the exact URL the portal's
+/// 登录 anchor lands on (verified 2026-09-03: single same-tab hop, no
+/// query params). The portal entry itself is a JS chain (Xuser-SDK token
+/// promise, then location.href) that never fires inside the Windows
+/// WebView2 login window (rc.3 stayed frozen on the portal), and the
+/// Linux AppImage build died on the click. Windows and Linux therefore
+/// skip the portal and land here directly; the injected script already
+/// handles this host (fill + submit), and after login the auth page
+/// redirects back to basic.smartedu.cn where the token lands in
+/// localStorage as usual. macOS keeps the proven portal entry.
+const _authLoginUrl = 'https://auth.smartedu.cn/uias/login';
+
 /// WebView2 resolves a relative [CreateConfiguration.userDataFolderWindows]
 /// next to the exe — read-only under Program Files, which makes the login
 /// webview die with "Edge cannot read or write its data directory". Point
@@ -40,6 +52,10 @@ String get _webview2DataFolder {
 /// JS injected on every page load: on the portal (logged out) clicks the
 /// 登录 entry; on auth.smartedu.cn fills username/password, ticks the
 /// agreement and presses 登录. The slider captcha stays for the human.
+/// Independent of that flow, a token watcher polls localStorage on EVERY
+/// *.smartedu.cn document and pushes the token the moment it lands — the
+/// post-login redirect target under smartedu.cn varies, so the capture
+/// must not be tied to basic.smartedu.cn.
 String credentialInjection(String account, String password) {
   final acc = _jsEscape(account);
   final pass = _jsEscape(password);
@@ -55,38 +71,41 @@ String credentialInjection(String account, String password) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   }
-  // Token push: WebKitGTK exposes the script message handler as
-  // window.<name>; WKWebView as window.webkit.messageHandlers.<name>.
+  // Token push: WebKitGTK >= 2.46 exposes the script message handler ONLY
+  // as window.webkit.messageHandlers.<name> (the legacy window.<name>
+  // object is gone — verified 2026-09-04 on webkit2gtk-4.1); WKWebView
+  // always uses the webkit.messageHandlers form. Try legacy first anyway.
   function __hcPush(v) {
     try {
       var ch = window['$_tokenChannelName'];
-      if (ch && ch.postMessage) { ch.postMessage(v); return; }
+      if (ch && ch.postMessage) { ch.postMessage(v); return true; }
       var wk = window.webkit && window.webkit.messageHandlers;
       var h = wk && wk['$_tokenChannelName'];
-      if (h && h.postMessage) h.postMessage(v);
+      if (h && h.postMessage) { h.postMessage(v); return true; }
+      var cv = window.chrome && window.chrome.webview;
+      if (cv && cv.postMessage) { cv.postMessage(v); return true; }
+    } catch (e) {}
+    return false;
+  }
+  // Watcher: any smartedu.cn origin, first token wins. Runs independently
+  // of evaluateJavaScript, whose async callback never fires on some
+  // WebKitGTK builds.
+  function __hcWatch() {
+    try {
+      if (location.host.indexOf('.smartedu.cn') < 0 &&
+          location.host !== 'smartedu.cn') return;
+      var v = localStorage.getItem(KEY);
+      if (v && v.length > 50 && __hcPush(v)) clearInterval(window.__hcTok);
     } catch (e) {}
   }
+  __hcWatch();
+  window.__hcTok = setInterval(__hcWatch, 500);
   var tries = 0;
   var timer = setInterval(function () {
     tries++;
     try {
       var host = location.host;
       if (host === 'basic.smartedu.cn') {
-        var existing = localStorage.getItem(KEY);
-        if (existing && existing.length > 50) {
-          clearInterval(timer);
-          __hcPush(existing);
-          return;
-        }
-        // Keep pushing until the portal writes the token after login —
-        // independent of evaluateJavaScript, whose async callback never
-        // fires on some WebKitGTK builds.
-        var t2 = setInterval(function () {
-          try {
-            var v = localStorage.getItem(KEY);
-            if (v && v.length > 50) { clearInterval(t2); __hcPush(v); }
-          } catch (e) {}
-        }, 500);
         var links = Array.prototype.slice.call(document.querySelectorAll('a'))
           .filter(function (a) { return (a.textContent || '').trim() === '登录'; });
         if (links.length) { clearInterval(timer); links[0].click(); }
@@ -213,11 +232,14 @@ class DesktopLoginService implements LoginService {
       } catch (_) {}
     }
 
-    // Channel push path (Linux/macOS): the injected script posts the
-    // token as soon as the portal writes it — no evaluate round-trip,
-    // which can hang forever on WebKitGTK builds whose async JS
-    // callbacks die mid-login (GLib criticals in WebKitWebProcess).
-    webview.registerJavaScriptMessageHandler(_tokenChannelName, (_, body) {
+    // Channel push path: the injected script posts the token as soon as
+    // the portal writes it — no evaluate round-trip, which can hang
+    // forever on WebKitGTK builds whose async JS callbacks die mid-login
+    // (GLib criticals in WebKitWebProcess). All three platforms push
+    // through __hcPush; the receiving end differs: WebView2 (Windows) has
+    // no named script channels, messages arrive via
+    // window.chrome.webview.postMessage as plain "onWebMessageReceived".
+    void handleTokenPush(dynamic body) {
       debugPrint(
           'HC_LOGIN token push received (${body is String ? body.length : body})');
       final value = body is String &&
@@ -234,7 +256,16 @@ class DesktopLoginService implements LoginService {
       } catch (e) {
         debugPrint('HC_LOGIN pushed token failed to parse: $e');
       }
-    });
+    }
+
+    if (Platform.isWindows) {
+      webview.addOnWebMessageReceivedCallback(handleTokenPush);
+    } else {
+      webview.registerJavaScriptMessageHandler(_tokenChannelName,
+          (_, body) {
+        handleTokenPush(body);
+      });
+    }
 
     webview.setOnUrlRequestCallback((url) {
       if (url.contains('basic.smartedu.cn')) {
@@ -250,13 +281,15 @@ class DesktopLoginService implements LoginService {
       done(const LoginResult(cancelled: true));
     }));
 
-    webview.launch(_loginUrl);
+    webview.launch(Platform.isWindows || Platform.isLinux
+        ? _authLoginUrl
+        : _loginUrl);
 
     // Dart-side token poll — fallback only: the primary capture is the
     // channel push above. evaluateJavaScript gets a hard timeout because
     // on some WebKitGTK builds its async callback never fires mid-login
     // and an unanswered invoke would hang this loop forever.
-    for (var i = 0; i < 300 && !finished; i++) {
+    for (var i = 0; i < 600 && !finished; i++) {
       await Future<void>.delayed(const Duration(seconds: 1));
       if (finished) break;
       try {

@@ -68,20 +68,33 @@ jobs:
       - name: Show toolchain
         run: flutter --version && dart --version
 
+      # Release signing when the keystore secret exists; on secret-less
+      # mirrors (manual test builds) fall through WITHOUT HC_KEYSTORE_PATH
+      # so gradle signs with the debug key. The resulting APK installs only
+      # beside other debug-signed builds — never upgrade-in-place over a
+      # release-signed install.
       - name: Restore pinned release keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          [ -n "$KEYSTORE_BASE64" ] || { echo "KEYSTORE_BASE64 secret missing"; exit 1; }
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "KEYSTORE_BASE64 secret missing -> DEBUG-signed APK (manual-test build only)"
+            exit 0
+          fi
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
 
-      - name: Build APK (release, pinned-cert signed)
+      - name: Build APK (release, pinned-cert signed or debug fallback)
         env:
-          HC_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
           HC_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           HC_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           HC_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          # Export only when the keystore was restored: gradle picks release
+          # signing purely on HC_KEYSTORE_PATH being set — an empty-string
+          # env var would still read as "set" and break the debug fallback.
+          if [ -s "$RUNNER_TEMP/release.keystore" ]; then
+            export HC_KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
+          fi
           flutter build apk --release \
             ${{ inputs.abi == 'split-per-abi' && '--split-per-abi' || '' }}
 

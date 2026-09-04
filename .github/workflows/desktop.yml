@@ -63,7 +63,7 @@ jobs:
     steps:
       - id: select
         run: |
-          all='[{"name":"macos-arm64","os":"macos-14"},{"name":"linux-x64","os":"ubuntu-22.04"},{"name":"windows-x64","os":"windows-2022"}]'
+          all='[{"name":"macos-arm64","os":"macos-14"},{"name":"linux-x64","os":"ubuntu-24.04"},{"name":"windows-x64","os":"windows-2022"}]'
           if [ "$GITHUB_EVENT_NAME" = "release" ]; then
             # Prereleases never start automatic builds; the artifacts are
             # shipped by dispatching this workflow with attach_tag set.
@@ -76,7 +76,7 @@ jobs:
             case "$PLATFORMS" in
               all) echo "include=$all" >> "$GITHUB_OUTPUT" ;;
               macos-arm64) echo 'include=[{"name":"macos-arm64","os":"macos-14"}]' >> "$GITHUB_OUTPUT" ;;
-              linux-x64) echo 'include=[{"name":"linux-x64","os":"ubuntu-22.04"}]' >> "$GITHUB_OUTPUT" ;;
+              linux-x64) echo 'include=[{"name":"linux-x64","os":"ubuntu-24.04"}]' >> "$GITHUB_OUTPUT" ;;
               windows-x64) echo 'include=[{"name":"windows-x64","os":"windows-2022"}]' >> "$GITHUB_OUTPUT" ;;
               *) echo "include=[]" >> "$GITHUB_OUTPUT" ;;
             esac
@@ -128,7 +128,7 @@ jobs:
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libwebkit2gtk-4.1-dev libsoup-3.0-dev libasound2-dev \
             libmpv-dev libsecret-1-dev libjsoncpp-dev \
-            librsvg2-dev libgirepository1.0-dev
+            librsvg2-dev libgirepository1.0-dev imagemagick
 
       # Fixed macOS signing: when the MACOS_CERT_P12_BASE64 /
       # MACOS_CERT_PASSWORD secrets exist, import the certificate into a
@@ -225,35 +225,95 @@ jobs:
             "../huichuang_basic-v${APP_VERSION}-macos-arm64.zip" \
             huichuang_basic.app Applications)
 
-      - name: Package (Linux AppImage)
+      - name: Package (Linux deb)
         if: runner.os == 'Linux'
-        env:
-          # Run AppImage tooling without FUSE (not available on runners).
-          APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
           APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          # The gtk plugin ships as a script on raw master — it has no
-          # release assets. linuxdeploy finds plugins via PATH.
-          wget -q -O linuxdeploy-plugin-gtk.sh \
-            https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-gtk.sh
-          export PATH="$PWD:$PATH"
-          # The flutter bundle is self-contained next to its binary
-          # (RPATH $ORIGIN/lib); place it under usr/bin as the AppDir payload.
-          install -d AppDir/usr/bin
-          cp -r build/linux/x64/release/bundle/. AppDir/usr/bin/
-          # linuxdeploy registers icons by FILENAME; it must match the
-          # desktop entry's Icon=huichuang_basic ("icon-512" made it fail
-          # with "could not find suitable icon"). Render the master into a
-          # valid 512x512 (runner image ships ImageMagick 6: `convert`).
-          convert assets/icon.png -resize 512x512 huichuang_basic.png
-          OUTPUT="huichuang_basic-v${APP_VERSION}-linux-x64.AppImage" \
-            ./linuxdeploy-x86_64.AppImage --appdir AppDir \
-            --executable AppDir/usr/bin/huichuang_basic \
-            --desktop-file packaging/linux/huichuang_basic.desktop \
-            --icon-file huichuang_basic.png \
-            --plugin gtk --output appimage
+          DEB=debroot
+          rm -rf "$DEB"
+          # Bundle NOTHING but the app itself: gtk, webkit2gtk, glib,
+          # gstreamer and the gdk-pixbuf loaders all resolve from the
+          # host, exactly like a local `flutter build linux` run. The
+          # rc.3 AppImages kept dying on host/bundle mismatches
+          # (WebKitGTK helper spawn paths, Ubuntu glib shadowing, and
+          # finally gdk-pixbuf's runner-generated loaders.cache failing
+          # to dlopen libpixbufloader-svg on the host -> Gtk assertion
+          # -> SIGABRT). A deb installs real files and inherits the
+          # session environment untouched. The one soname the app links
+          # that is NOT everywhere: libmpv. The runner must be
+          # ubuntu-24.04 (noble, libmpv soname 2) so the deb runs on
+          # Arch / Debian 12+ / Fedora hosts via their own libmpv2; the
+          # jammy build linked libmpv.so.1, which only jammy itself
+          # ships.
+          install -d "$DEB/usr/lib/huichuang_basic" "$DEB/usr/bin" \
+            "$DEB/usr/share/applications" \
+            "$DEB/usr/share/icons/hicolor/512x512/apps" "$DEB/DEBIAN"
+          cp -r build/linux/x64/release/bundle/. "$DEB/usr/lib/huichuang_basic/"
+          printf '#!/bin/sh\nexec /usr/lib/huichuang_basic/huichuang_basic "$@"\n' \
+            > "$DEB/usr/bin/huichuang_basic"
+          chmod 755 "$DEB/usr/bin/huichuang_basic"
+          install -m 644 packaging/linux/huichuang_basic.desktop \
+            "$DEB/usr/share/applications/"
+          convert assets/icon.png -resize 512x512 \
+            "$DEB/usr/share/icons/hicolor/512x512/apps/huichuang_basic.png"
+          cat > "$DEB/DEBIAN/control" <<EOF
+          Package: huichuang-basic
+          Version: $APP_VERSION
+          Architecture: amd64
+          Maintainer: bluseliu50 <265648257+bluseliu50@users.noreply.github.com>
+          Depends: libgtk-3-0 | libgtk-3-0t64, libwebkit2gtk-4.1-0, libmpv2
+          Section: education
+          Priority: optional
+          Description: Unofficial client for basic.smartedu.cn
+           Product name: 惠窗中小学端. Non-commercial use only
+           (CC BY-NC-SA 4.0).
+          EOF
+          dpkg-deb --build --root-owner-group "$DEB" \
+            "huichuang_basic-v${APP_VERSION}-linux-amd64.deb"
+
+      # Same Flutter build, second package format: a pacman -U
+      # installable .pkg.tar.zst, assembled by real makepkg inside an
+      # archlinux:base container (pattern replicated from
+      # mijailr/arch-makepkg-action, inlined so the staging layout is
+      # ours: PKGBUILD + ./stage payload; nothing is published to the
+      # AUR or any pacman repo). makepkg refuses to run as root, hence
+      # the builder user.
+      - name: Package (Arch pacman)
+        if: runner.os == 'Linux'
+        run: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
+          # pkgver may not contain '-' (pkgrel separator). Dropping it
+          # (0.1.0-rc.3 -> 0.1.0rc.3) vercmp-sorts BEFORE 0.1.0, unlike
+          # '_' or '~' which both sort after the final release.
+          PKGVER=${APP_VERSION//-/}
+          STAGE=stage
+          rm -rf "$STAGE" pkgbuild
+          install -d "$STAGE/usr/lib/huichuang_basic" "$STAGE/usr/bin" \
+            "$STAGE/usr/share/applications" \
+            "$STAGE/usr/share/icons/hicolor/512x512/apps"
+          cp -r build/linux/x64/release/bundle/. "$STAGE/usr/lib/huichuang_basic/"
+          printf '#!/bin/sh\nexec /usr/lib/huichuang_basic/huichuang_basic "$@"\n' \
+            > "$STAGE/usr/bin/huichuang_basic"
+          chmod 755 "$STAGE/usr/bin/huichuang_basic"
+          install -m 644 packaging/linux/huichuang_basic.desktop \
+            "$STAGE/usr/share/applications/"
+          convert assets/icon.png -resize 512x512 \
+            "$STAGE/usr/share/icons/hicolor/512x512/apps/huichuang_basic.png"
+          install -d pkgbuild
+          sed "s/PLACEHOLDER_VERSION/$PKGVER/" packaging/arch/PKGBUILD \
+            > pkgbuild/PKGBUILD
+          cp -r "$STAGE" pkgbuild/stage
+          docker run --rm -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD:/work" -w /work/pkgbuild archlinux:base \
+            bash -ec '
+              pacman -Sy --noconfirm base-devel >/dev/null
+              useradd -m builder
+              chown -R builder:builder /work/pkgbuild
+              su builder -s /bin/bash -c "cd /work/pkgbuild && makepkg --nodeps --noconfirm -f"
+              chown -R "$HOST_UID:$HOST_GID" /work/pkgbuild
+            '
+          mv pkgbuild/huichuang-basic-*.pkg.tar.zst \
+            "huichuang_basic-v${APP_VERSION}-x86_64.pkg.tar.zst"
       - name: Package (Windows installer)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -264,19 +324,25 @@ jobs:
                       ForEach-Object { $_.Matches[0].Groups[1].Value }) -split '\+' | Select-Object -First 1
           & $iscc "/DAppVersion=$version" packaging\windows\installer.iss
 
-      - name: Locate dist file
+      - name: Locate dist files
         id: dist
         shell: bash
         run: |
-          # Exactly one dist file per job. The macOS zip sits at depth 6
-          # (build/macos/Build/Products/Release); Windows/Linux land at the
-          # repo root.
+          # One or two dist files per job (Linux ships a deb AND a
+          # pacman package). The macOS zip sits at depth 6
+          # (build/macos/Build/Products/Release); Windows/Linux land at
+          # the repo root. Multiline output: every consumer word-splits.
           dist=$(find build . -maxdepth 8 \( \
             -name 'huichuang_basic-v*.zip' \
-            -o -name 'huichuang_basic-v*.AppImage' \
-            -o -name 'huichuang_basic-v*-setup.exe' \) -print -quit)
-          echo "files=$dist" >> "$GITHUB_OUTPUT"
-          ls -l "$dist"
+            -o -name 'huichuang_basic-v*.deb' \
+            -o -name 'huichuang_basic-v*.pkg.tar.zst' \
+            -o -name 'huichuang_basic-v*-setup.exe' \) -print)
+          {
+            echo "files<<EOF_DIST"
+            echo "$dist"
+            echo "EOF_DIST"
+          } >> "$GITHUB_OUTPUT"
+          ls -l $dist
 
       - uses: actions/upload-artifact@v4
         with:

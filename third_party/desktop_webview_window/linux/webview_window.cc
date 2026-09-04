@@ -184,6 +184,24 @@ WebviewWindow::WebviewWindow(FlMethodChannel *method_channel, int64_t window_id,
   gtk_box_pack_start(box_, title_bar, FALSE, FALSE, 0);
 
   // initial web_view
+  // (hc7) The settings-level NEVER policy (hc3) does not stop the web
+  // process from using its accelerated compositing loop on NVIDIA
+  // hosts: the login window stays blank ("Timed out waiting for OpenGL
+  // frame") until WebKitGTK's compositing mode is disabled via env,
+  // which is read when the WebKitWebProcess spawns - i.e. below, at
+  // webview construction. g_setenv with overwrite=FALSE keeps any
+  // explicit user override in charge.
+  g_setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", FALSE);
+  // (hc8) Even with compositing disabled (hc7), WebKitGTK >= 2.42 paints
+  // tiles through the DMABUF renderer, which initializes EGL inside the
+  // WebKitWebProcess. On NVIDIA proprietary drivers that process segfaults
+  // in libnvidia-eglcore when its contexts tear down (coredump: SEGV in
+  // WebKitWebProcess at window close, driver 610.57.04) - the web process
+  // death takes the shared buffers down mid-flight. Disabling the DMABUF
+  // renderer keeps every pixel in shared-memory buffers: zero EGL in the
+  // web process. Same env contract as hc7: read at web-process spawn,
+  // explicit user override wins.
+  g_setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", FALSE);
   webview_ = webkit_web_view_new();
   g_signal_connect(G_OBJECT(webview_), "load-failed-with-tls-errors",
                    G_CALLBACK(on_load_failed_with_tls_errors), this);
@@ -377,20 +395,16 @@ FlValue *WebviewWindow::GetAllCookies() {
 
 gboolean WebviewWindow::DecidePolicy(WebKitPolicyDecision *decision,
                                      WebKitPolicyDecisionType type) {
-  if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
-    auto *navigation_decision = WEBKIT_NAVIGATION_POLICY_DECISION(decision);
-    auto *navigation_action =
-        webkit_navigation_policy_decision_get_navigation_action(
-            navigation_decision);
-    auto *request = webkit_navigation_action_get_request(navigation_action);
-    auto *uri = webkit_uri_request_get_uri(request);
-    auto *args = fl_value_new_map();
-    fl_value_set(args, fl_value_new_string("id"), fl_value_new_int(window_id_));
-    fl_value_set(args, fl_value_new_string("url"), fl_value_new_string(uri));
-    fl_method_channel_invoke_method(FL_METHOD_CHANNEL(method_channel_),
-                                    "onUrlRequested", args, nullptr, nullptr,
-                                    nullptr);
-  }
+  // Patched (hc6): no method-channel call from inside the decide-policy
+  // signal. Upstream invoked "onUrlRequested" on the Flutter engine from
+  // this WebKit signal handler on every navigation; on the AppImage build
+  // (bundled WebKitGTK from ubuntu-22.04) that cross-engine call at
+  // navigation time took the whole process down with SIGTRAP the moment
+  // the portal's 登录 click navigated (rc.3), while the same code ran
+  // fine against the system WebKitGTK 2.52 in dev builds. The
+  // notification only fed a cosmetic status string in this app — the
+  // token capture does not depend on it. Default policy (allow) is
+  // unchanged.
   return false;
 }
 
