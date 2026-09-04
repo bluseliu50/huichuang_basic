@@ -143,7 +143,7 @@ packages:
       path: "third_party/desktop_webview_window"
       relative: true
     source: path
-    version: "0.3.0+hc6"
+    version: "0.3.0+hc7"
   dio:
     dependency: "direct main"
     description:

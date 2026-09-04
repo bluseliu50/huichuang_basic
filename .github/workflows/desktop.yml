@@ -76,7 +76,7 @@ jobs:
             case "$PLATFORMS" in
               all) echo "include=$all" >> "$GITHUB_OUTPUT" ;;
               macos-arm64) echo 'include=[{"name":"macos-arm64","os":"macos-14"}]' >> "$GITHUB_OUTPUT" ;;
-            linux-x64) echo 'include=[{"name":"linux-x64","os":"ubuntu-24.04"}]' >> "$GITHUB_OUTPUT" ;;
+              linux-x64) echo 'include=[{"name":"linux-x64","os":"ubuntu-24.04"}]' >> "$GITHUB_OUTPUT" ;;
               windows-x64) echo 'include=[{"name":"windows-x64","os":"windows-2022"}]' >> "$GITHUB_OUTPUT" ;;
               *) echo "include=[]" >> "$GITHUB_OUTPUT" ;;
             esac
@@ -270,6 +270,48 @@ jobs:
           EOF
           dpkg-deb --build --root-owner-group "$DEB" \
             "huichuang_basic-v${APP_VERSION}-linux-amd64.deb"
+
+      # Same Flutter build, second package format: a pacman -U
+      # installable .pkg.tar.zst, assembled by real makepkg inside an
+      # archlinux:base container (pattern replicated from
+      # mijailr/arch-makepkg-action, inlined so the staging layout is
+      # ours: PKGBUILD + ./stage payload; nothing is published to the
+      # AUR or any pacman repo). makepkg refuses to run as root, hence
+      # the builder user.
+      - name: Package (Arch pacman)
+        if: runner.os == 'Linux'
+        run: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
+          # pkgver may not contain '-' (pkgrel separator). Dropping it
+          # (0.1.0-rc.3 -> 0.1.0rc.3) vercmp-sorts BEFORE 0.1.0, unlike
+          # '_' or '~' which both sort after the final release.
+          PKGVER=${APP_VERSION//-/}
+          STAGE=stage
+          rm -rf "$STAGE" pkgbuild
+          install -d "$STAGE/usr/lib/huichuang_basic" "$STAGE/usr/bin" \
+            "$STAGE/usr/share/applications" \
+            "$STAGE/usr/share/icons/hicolor/512x512/apps"
+          cp -r build/linux/x64/release/bundle/. "$STAGE/usr/lib/huichuang_basic/"
+          printf '#!/bin/sh\nexec /usr/lib/huichuang_basic/huichuang_basic "$@"\n' \
+            > "$STAGE/usr/bin/huichuang_basic"
+          chmod 755 "$STAGE/usr/bin/huichuang_basic"
+          install -m 644 packaging/linux/huichuang_basic.desktop \
+            "$STAGE/usr/share/applications/"
+          convert assets/icon.png -resize 512x512 \
+            "$STAGE/usr/share/icons/hicolor/512x512/apps/huichuang_basic.png"
+          install -d pkgbuild
+          sed "s/PLACEHOLDER_VERSION/$PKGVER/" packaging/arch/PKGBUILD \
+            > pkgbuild/PKGBUILD
+          cp -r "$STAGE" pkgbuild/stage
+          docker run --rm -v "$PWD:/work" -w /work/pkgbuild archlinux:base \
+            bash -ec '
+              pacman -Sy --noconfirm base-devel >/dev/null
+              useradd -m builder
+              chown -R builder:builder /work/pkgbuild
+              su builder -s /bin/bash -c "cd /work/pkgbuild && makepkg --nodeps --noconfirm -f"
+            '
+          mv pkgbuild/huichuang-basic-*.pkg.tar.zst \
+            "huichuang_basic-v${APP_VERSION}-x86_64.pkg.tar.zst"
       - name: Package (Windows installer)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -280,19 +322,25 @@ jobs:
                       ForEach-Object { $_.Matches[0].Groups[1].Value }) -split '\+' | Select-Object -First 1
           & $iscc "/DAppVersion=$version" packaging\windows\installer.iss
 
-      - name: Locate dist file
+      - name: Locate dist files
         id: dist
         shell: bash
         run: |
-          # Exactly one dist file per job. The macOS zip sits at depth 6
-          # (build/macos/Build/Products/Release); Windows/Linux land at the
-          # repo root.
+          # One or two dist files per job (Linux ships a deb AND a
+          # pacman package). The macOS zip sits at depth 6
+          # (build/macos/Build/Products/Release); Windows/Linux land at
+          # the repo root. Multiline output: every consumer word-splits.
           dist=$(find build . -maxdepth 8 \( \
             -name 'huichuang_basic-v*.zip' \
             -o -name 'huichuang_basic-v*.deb' \
-            -o -name 'huichuang_basic-v*-setup.exe' \) -print -quit)
-          echo "files=$dist" >> "$GITHUB_OUTPUT"
-          ls -l "$dist"
+            -o -name 'huichuang_basic-v*.pkg.tar.zst' \
+            -o -name 'huichuang_basic-v*-setup.exe' \) -print)
+          {
+            echo "files<<EOF_DIST"
+            echo "$dist"
+            echo "EOF_DIST"
+          } >> "$GITHUB_OUTPUT"
+          ls -l $dist
 
       - uses: actions/upload-artifact@v4
         with:

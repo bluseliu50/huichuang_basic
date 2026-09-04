@@ -1,0 +1,21 @@
+# Consumed by .github/workflows/desktop.yml (arch-x64 job). The workflow
+# seds PLACEHOLDER_VERSION from pubspec (with '-' -> '~' so pre-releases
+# sort before the final release) and stages the built Flutter bundle next
+# to this file as ./stage; makepkg assembles the pacman package from it.
+pkgname=huichuang-basic
+pkgver=PLACEHOLDER_VERSION
+pkgrel=1
+pkgdesc='Unofficial client for basic.smartedu.cn (惠窗中小学端)'
+arch=(x86_64)
+url='https://github.com/bluseliu50/huichuang_basic'
+license=('LicenseRef-CC-BY-NC-SA-4.0')
+depends=(gtk3 webkit2gtk-4.1 mpv libsecret jsoncpp hicolor-icon-theme)
+options=(!strip !emptydirs)
+
+build() {
+  :
+}
+
+package() {
+  cp -a "$startdir/stage/usr" "$pkgdir/"
+}
