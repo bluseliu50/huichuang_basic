@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 // Standalone entrypoint reproducing the login-webview crash reported on
 // Linux release builds: open the portal, let the injected script click
 // 登录, and watch the navigation to auth.smartedu.cn.
@@ -17,7 +18,7 @@ Future<void> main() async {
   final result = await service.login(
     account: '13800000000',
     password: 'probe-dummy',
-    onStatus: (m) => debugPrint('HC_PROBE status: $m'),
+    onStatus: (m) => print('HC_PROBE status: $m'),
   );
-  debugPrint('HC_PROBE result: $result');
+  print('HC_PROBE result: $result');
 }

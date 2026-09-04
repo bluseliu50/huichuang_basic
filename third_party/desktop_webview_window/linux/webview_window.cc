@@ -184,6 +184,14 @@ WebviewWindow::WebviewWindow(FlMethodChannel *method_channel, int64_t window_id,
   gtk_box_pack_start(box_, title_bar, FALSE, FALSE, 0);
 
   // initial web_view
+  // (hc7) The settings-level NEVER policy (hc3) does not stop the web
+  // process from using its accelerated compositing loop on NVIDIA
+  // hosts: the login window stays blank ("Timed out waiting for OpenGL
+  // frame") until WebKitGTK's compositing mode is disabled via env,
+  // which is read when the WebKitWebProcess spawns - i.e. below, at
+  // webview construction. g_setenv with overwrite=FALSE keeps any
+  // explicit user override in charge.
+  g_setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", FALSE);
   webview_ = webkit_web_view_new();
   g_signal_connect(G_OBJECT(webview_), "load-failed-with-tls-errors",
                    G_CALLBACK(on_load_failed_with_tls_errors), this);
