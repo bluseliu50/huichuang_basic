@@ -63,7 +63,7 @@ jobs:
     steps:
       - id: select
         run: |
-          all='[{"name":"macos-arm64","os":"macos-14"},{"name":"linux-x64","os":"ubuntu-22.04"},{"name":"windows-x64","os":"windows-2022"}]'
+          all='[{"name":"macos-arm64","os":"macos-14"},{"name":"linux-x64","os":"ubuntu-24.04"},{"name":"windows-x64","os":"windows-2022"}]'
           if [ "$GITHUB_EVENT_NAME" = "release" ]; then
             # Prereleases never start automatic builds; the artifacts are
             # shipped by dispatching this workflow with attach_tag set.
@@ -76,7 +76,7 @@ jobs:
             case "$PLATFORMS" in
               all) echo "include=$all" >> "$GITHUB_OUTPUT" ;;
               macos-arm64) echo 'include=[{"name":"macos-arm64","os":"macos-14"}]' >> "$GITHUB_OUTPUT" ;;
-              linux-x64) echo 'include=[{"name":"linux-x64","os":"ubuntu-22.04"}]' >> "$GITHUB_OUTPUT" ;;
+            linux-x64) echo 'include=[{"name":"linux-x64","os":"ubuntu-24.04"}]' >> "$GITHUB_OUTPUT" ;;
               windows-x64) echo 'include=[{"name":"windows-x64","os":"windows-2022"}]' >> "$GITHUB_OUTPUT" ;;
               *) echo "include=[]" >> "$GITHUB_OUTPUT" ;;
             esac
@@ -239,7 +239,12 @@ jobs:
           # finally gdk-pixbuf's runner-generated loaders.cache failing
           # to dlopen libpixbufloader-svg on the host -> Gtk assertion
           # -> SIGABRT). A deb installs real files and inherits the
-          # session environment untouched.
+          # session environment untouched. The one soname the app links
+          # that is NOT everywhere: libmpv. The runner must be
+          # ubuntu-24.04 (noble, libmpv soname 2) so the deb runs on
+          # Arch / Debian 12+ / Fedora hosts via their own libmpv2; the
+          # jammy build linked libmpv.so.1, which only jammy itself
+          # ships.
           install -d "$DEB/usr/lib/huichuang_basic" "$DEB/usr/bin" \
             "$DEB/usr/share/applications" \
             "$DEB/usr/share/icons/hicolor/512x512/apps" "$DEB/DEBIAN"
@@ -256,7 +261,7 @@ jobs:
           Version: $APP_VERSION
           Architecture: amd64
           Maintainer: bluseliu50 <265648257+bluseliu50@users.noreply.github.com>
-          Depends: libgtk-3-0 | libgtk-3-0t64, libwebkit2gtk-4.1-0
+          Depends: libgtk-3-0 | libgtk-3-0t64, libwebkit2gtk-4.1-0, libmpv2
           Section: education
           Priority: optional
           Description: Unofficial client for basic.smartedu.cn
