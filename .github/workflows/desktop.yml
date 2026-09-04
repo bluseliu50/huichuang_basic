@@ -128,7 +128,7 @@ jobs:
             libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libwebkit2gtk-4.1-dev libsoup-3.0-dev libasound2-dev \
             libmpv-dev libsecret-1-dev libjsoncpp-dev \
-            librsvg2-dev libgirepository1.0-dev
+            librsvg2-dev libgirepository1.0-dev imagemagick
 
       # Fixed macOS signing: when the MACOS_CERT_P12_BASE64 /
       # MACOS_CERT_PASSWORD secrets exist, import the certificate into a
