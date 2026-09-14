@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 
 import '../../api/models.dart';
 import '../../auth/auth_controller.dart';
+import '../../download/download.dart';
 import '../../store/app_state.dart';
 import '../../stream/proxy.dart';
+import '../export_file.dart';
 import '../login/login_card.dart';
 import 'pdf_reader_page.dart';
 
@@ -228,34 +230,50 @@ class _BookCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Builder(builder: (context) {
-                    final cover = context
-                        .watch<AppController>()
-                        .textbookCoverOf(book.id);
-                    if (cover == null) {
-                      return Container(
-                        width: double.infinity,
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        child: Icon(Icons.menu_book_outlined,
-                            size: 40,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onPrimaryContainer),
-                      );
-                    }
-                    return CachedNetworkImage(
-                      imageUrl: cover.toString(),
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      errorWidget: (_, _, _) => Container(
-                        width: double.infinity,
-                        color:
-                            Theme.of(context).colorScheme.primaryContainer,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Builder(builder: (context) {
+                          final cover = context
+                              .watch<AppController>()
+                              .textbookCoverOf(book.id);
+                          if (cover == null) {
+                            return Container(
+                              width: double.infinity,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                              child: Icon(
+                                Icons.menu_book_outlined,
+                                size: 40,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                              ),
+                            );
+                          }
+                          return CachedNetworkImage(
+                            imageUrl: cover.toString(),
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            errorWidget: (_, _, _) => Container(
+                              width: double.infinity,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                            ),
+                          );
+                        }),
                       ),
-                    );
-                  }),
+                    ),
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: _DownloadBadge(onTap: () => _download(context)),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -273,6 +291,36 @@ class _BookCard extends StatelessWidget {
     );
   }
 
+
+  Future<void> _download(BuildContext context) async {
+    final app = context.read<AppController>();
+    final proxy = context.read<StreamProxy>();
+    try {
+      final detail = await app.client.getTextbookDetail(book.id);
+      final pdf = detail.related
+          .where((r) => (r.format ?? '').toLowerCase() == 'pdf')
+          .toList();
+      final target = pdf.isNotEmpty
+          ? pdf.first
+          : (detail.related.isNotEmpty ? detail.related.first : null);
+      if (target == null || target.storages.isEmpty) {
+        throw StateError('该教材没有可下载的 PDF');
+      }
+      if (!context.mounted) return;
+      await exportFile(
+        context,
+        proxyUrl: proxy.fileUrl(target.storages.first),
+        fileName: attachmentFileName(book.title, target.format),
+        mimeType: mimeForFormat(target.format),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('下载教材失败：$e')),
+        );
+      }
+    }
+  }
   Future<void> _open(BuildContext context) async {
     final auth = context.read<AuthController>();
     final app = context.read<AppController>();
@@ -309,5 +357,32 @@ class _BookCard extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+/// Round frosted 下载 button overlaid on a textbook cover.
+class _DownloadBadge extends StatelessWidget {
+  const _DownloadBadge({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black45,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(6),
+          child: Icon(
+            Icons.download_outlined,
+            size: 18,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
   }
 }
