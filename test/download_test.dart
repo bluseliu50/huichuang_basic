@@ -160,4 +160,99 @@ void main() {
       expect(dest.existsSync(), isFalse);
     });
   });
+
+  group('cachedDownload', () {
+    late HttpServer server;
+
+    setUp(() async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    });
+
+    tearDown(() async {
+      await server.close(force: true);
+    });
+
+    Uri url() => Uri.parse('http://127.0.0.1:${server.port}/file');
+
+    void cleanSlots(Iterable<Uri> upstreams) {
+      for (final u in upstreams) {
+        try {
+          cacheSlotFor(u).deleteSync();
+        } catch (_) {}
+      }
+    }
+
+    test('transfers once and reuses the slot', () async {
+      final payload = List<int>.generate(8192, (i) => i & 0xFF);
+      var hits = 0;
+      server.listen((req) async {
+        hits++;
+        req.response.statusCode = 200;
+        req.response.contentLength = payload.length;
+        req.response.add(payload);
+        await req.response.close();
+      });
+
+      final upstream = Uri.parse('https://r1.example.test/doc.pdf');
+      final otherUpstream = Uri.parse('https://r1.example.test/other.pdf');
+      addTearDown(() => cleanSlots([upstream, otherUpstream]));
+
+      final slot = cacheSlotFor(upstream);
+      expect(slot.existsSync(), isFalse, reason: 'slot must start absent');
+
+      final first = await cachedDownload(url(), upstream);
+      expect(first.path, slot.path);
+      expect(await slot.readAsBytes(), payload);
+      expect(hits, 1);
+
+      // Second open: cache hit, zero network.
+      final second = await cachedDownload(url(), upstream);
+      expect(second.path, slot.path);
+      expect(hits, 1);
+
+      // A different upstream gets its own slot.
+      final other = await cachedDownload(url(), otherUpstream);
+      expect(other.path, isNot(slot.path));
+      expect(hits, 2);
+    });
+
+    test('cancel leaves no slot and no tmp litter', () async {
+      const chunkSize = 4 * 1024;
+      const chunks = 64;
+      server.listen((req) async {
+        req.response.statusCode = 200;
+        req.response.contentLength = chunkSize * chunks;
+        final chunk = List<int>.filled(chunkSize, 1);
+        for (var i = 0; i < chunks; i++) {
+          req.response.add(chunk);
+          await req.response.flush();
+          await Future<void>.delayed(const Duration(milliseconds: 2));
+        }
+        await req.response.close();
+      });
+      final upstream = Uri.parse('https://r1.example.test/cancel-me.pdf');
+      addTearDown(() => cleanSlots([upstream]));
+      final slot = cacheSlotFor(upstream);
+      var cancelled = false;
+
+      await expectLater(
+        cachedDownload(
+          url(),
+          upstream,
+          onProgress: (received, total) {
+            if (received > 0) cancelled = true;
+          },
+          cancelled: () => cancelled,
+        ),
+        throwsA(isA<DownloadCancelled>()),
+      );
+      expect(slot.existsSync(), isFalse);
+      expect(
+        slot.parent.existsSync()
+            ? slot.parent.listSync().where((e) => e.path.contains('.tmp'))
+            : const <FileSystemEntity>[],
+        isEmpty,
+      );
+    });
+  });
 }

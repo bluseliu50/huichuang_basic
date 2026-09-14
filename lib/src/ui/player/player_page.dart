@@ -723,23 +723,18 @@ class _PlayerPageState extends State<PlayerPage> {
       );
       return;
     }
-    // Non-PDF: download through the proxy and hand to the system.
+    // Non-PDF: fetch through the shared cache (one transfer per document,
+    // shared with the export flow) and hand to the system opener.
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('正在下载 ${doc.title} …')));
     try {
-      final client = HttpClient();
-      final req = await client.getUrl(url);
-      final res = await req.close();
-      final name =
-          '${doc.title}.${(doc.format ?? 'bin').replaceAll(RegExp(r'[^a-z0-9]'), '')}';
-      final dir = _isDesktop ? Directory.systemTemp : await _mobileDownloads();
-      final file = File('${dir.path}/$name');
-      final sink = file.openWrite();
-      await for (final chunk in res) {
-        sink.add(chunk);
-      }
-      await sink.close();
+      final cached = await cachedDownload(url, upstreamOf(url)!);
+      final file = File(
+        '${(_isDesktop ? Directory.systemTemp : await _mobileDownloads()).path}/'
+        '${attachmentFileName(doc.title, doc.format)}',
+      );
+      await cached.copy(file.path);
       if (_isDesktop) {
         final opener = Platform.isMacOS
             ? 'open'

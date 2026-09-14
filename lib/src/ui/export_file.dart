@@ -1,6 +1,6 @@
-/// Cross-platform 下载导出: streams a proxy URL to a temp file with a
-/// progress dialog, then hands the bytes to `FilePicker.saveFile`, which
-/// shows the platform's native save dialog and writes the file itself —
+/// Cross-platform 下载导出: streams a proxy URL into the on-disk cache
+/// with a progress dialog, then hands the bytes to `FilePicker.saveFile`,
+/// which shows the platform's native save dialog and writes the file itself —
 /// NSSavePanel (macOS), IFileSaveDialog (Windows), XDG portal (Linux),
 /// SAF create-document (Android), UIDocumentPicker export (iOS).
 ///
@@ -8,6 +8,9 @@
 /// the macOS entitlement opt-out (this app is not sandboxed, and
 /// file_picker refuses save dialogs without the read-write user-selected
 /// entitlement unless told to skip the check).
+///
+/// Downloads land in the shared cache keyed by the upstream URL, so
+/// preview-then-export (or export-then-preview) transfers the bytes once.
 library;
 
 import 'dart:io';
@@ -22,8 +25,17 @@ import 'login/login_card.dart';
 
 bool _macosEntitlementsSkipped = false;
 
-/// Downloads [proxyUrl] (a StreamProxy file URL) and exports it through the
-/// native save dialog as [fileName].
+/// Extracts the upstream resource URL from a StreamProxy file URL
+/// (`/file?u=<encoded upstream>`); the cache key must survive proxy
+/// restarts, and the ported loopback URL does not.
+Uri? upstreamOf(Uri proxyUrl) {
+  final u = proxyUrl.queryParameters['u'];
+  if (u == null || u.isEmpty) return null;
+  return Uri.tryParse(u);
+}
+
+/// Downloads [proxyUrl] through the cache and exports it via the native
+/// save dialog as [fileName].
 ///
 /// Returns true when the file was written, false when the user canceled
 /// (login, progress dialog or save dialog) — cancellations are silent.
@@ -40,33 +52,42 @@ Future<bool> exportFile(
     if (context.mounted) showLoginCard(context);
     return false;
   }
-
-  final tmpDir = await Directory.systemTemp.createTemp('hc_export_');
-  if (!context.mounted) {
-    try {
-      await tmpDir.delete(recursive: true);
-    } catch (_) {}
-    return false;
+  final upstream = upstreamOf(proxyUrl);
+  if (upstream == null) {
+    throw ArgumentError('proxyUrl must be a StreamProxy file URL: $proxyUrl');
   }
+  if (!context.mounted) return false;
 
   // Drive the download from inside the dialog so progress and cancel live
   // with the UI that shows them.
-  final temp = await showDialog<File>(
+  final cached = await showDialog<File>(
     context: context,
     barrierDismissible: false,
     builder: (_) => _ExportDialog(
       url: proxyUrl,
-      dest: File('${tmpDir.path}/data'),
+      upstream: upstream,
       fileName: fileName,
     ),
   );
-  if (temp == null) {
-    try {
-      await tmpDir.delete(recursive: true);
-    } catch (_) {}
-    return false;
-  }
+  if (cached == null) return false;
+  if (!context.mounted) return false; // bytes stay cached for the next open
+  return exportLocalFile(
+    context,
+    file: cached,
+    fileName: fileName,
+    mimeType: mimeType,
+  );
+}
 
+/// Save-dialog half only: exports an already-downloaded local [file] — no
+/// network, no login (the bytes are already on disk). The reader uses this
+/// so preview-then-export never downloads twice.
+Future<bool> exportLocalFile(
+  BuildContext context, {
+  required File file,
+  required String fileName,
+  required String mimeType,
+}) async {
   try {
     if (!_macosEntitlementsSkipped) {
       _macosEntitlementsSkipped = true;
@@ -74,7 +95,7 @@ Future<bool> exportFile(
     }
     final saved = await FilePicker.saveFile(
       fileName: fileName,
-      bytes: await temp.readAsBytes(),
+      bytes: await file.readAsBytes(),
       mimeType: mimeType,
       dialogTitle: '保存 $fileName',
     );
@@ -93,22 +114,18 @@ Future<bool> exportFile(
       );
     }
     return false;
-  } finally {
-    try {
-      await tmpDir.delete(recursive: true);
-    } catch (_) {}
   }
 }
 
 class _ExportDialog extends StatefulWidget {
   const _ExportDialog({
     required this.url,
-    required this.dest,
+    required this.upstream,
     required this.fileName,
   });
 
   final Uri url;
-  final File dest;
+  final Uri upstream;
   final String fileName;
 
   @override
@@ -129,9 +146,9 @@ class _ExportDialogState extends State<_ExportDialog> {
 
   Future<void> _run() async {
     try {
-      final file = await downloadToFile(
+      final file = await cachedDownload(
         widget.url,
-        widget.dest,
+        widget.upstream,
         onProgress: (received, total) {
           if (mounted) {
             setState(() {

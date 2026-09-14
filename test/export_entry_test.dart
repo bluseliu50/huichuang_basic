@@ -1,6 +1,7 @@
 // Issue #5 entry points: every textbook card carries a 下载 button, the
-// PDF reader an AppBar export action. The download tap is exercised up to
-// the detail fetch — the fake client throws, asserting the error snackbar
+// PDF reader opens download-first (cache) and exposes the export action
+// only once the bytes are local. The download tap is exercised up to the
+// detail fetch — the fake client throws, asserting the error snackbar
 // path without touching FilePicker (native, unavailable in tests).
 import 'dart:io';
 
@@ -10,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:huichuang_basic/src/api/catalog.dart';
 import 'package:huichuang_basic/src/api/client.dart';
 import 'package:huichuang_basic/src/api/models.dart';
+import 'package:huichuang_basic/src/download/download.dart';
 import 'package:huichuang_basic/src/stream/proxy.dart';
 import 'package:huichuang_basic/src/store/app_state.dart';
 import 'package:huichuang_basic/src/ui/pdf/pdf_reader_page.dart';
@@ -112,6 +114,13 @@ Future<AppController> _app(WidgetTester tester) async {
   return app;
 }
 
+/// Smallest pdfium-tolerable PDF (xref-less; pdfium rebuilds it).
+const _tinyPdf = '%PDF-1.4\n'
+    '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n'
+    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n'
+    '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\n'
+    'trailer<</Size 4/Root 1 0 R>>\n%%EOF';
+
 void main() {
   testWidgets('textbook card shows a download button', (tester) async {
     final app = await _app(tester);
@@ -138,12 +147,40 @@ void main() {
     expect(find.textContaining('下载教材失败'), findsOneWidget);
   });
 
-  testWidgets('pdf reader exposes an AppBar export action', (tester) async {
+  testWidgets('reader with an uncached document surfaces the download error',
+      (tester) async {
+    // The binding's fake HttpClient answers 400, driving _prepare into the
+    // error state; the export action must stay hidden without local bytes.
     await tester.pumpWidget(
       MaterialApp(
         home: PdfReaderPage(
           title: '测试教材',
-          url: Uri.parse('http://127.0.0.1:1/file?u=x'),
+          url: Uri.parse('http://127.0.0.1:1/file?u=hc_no_such_doc'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('打开失败'), findsOneWidget);
+    expect(find.byTooltip('下载 PDF'), findsNothing);
+  });
+
+  testWidgets('reader with a cached document opens and offers export',
+      (tester) async {
+    final slot = cacheSlotFor(Uri.parse('hc_cached_doc'));
+    slot.parent.createSync(recursive: true);
+    slot.writeAsStringSync(_tinyPdf);
+    addTearDown(() {
+      try {
+        slot.deleteSync();
+      } catch (_) {}
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PdfReaderPage(
+          title: '测试教材',
+          url: Uri.parse('http://127.0.0.1:1/file?u=hc_cached_doc'),
         ),
       ),
     );
