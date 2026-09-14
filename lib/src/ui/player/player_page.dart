@@ -12,13 +12,12 @@ import 'package:window_manager/window_manager.dart';
 import '../../api/client.dart';
 import '../../api/models.dart';
 import '../../auth/auth_controller.dart';
-import '../../download/download.dart';
 import '../../store/app_state.dart';
 import '../../stream/proxy.dart';
 import '../breakpoints.dart';
-import '../export_file.dart';
 import '../login/login_card.dart';
 import '../pdf/pdf_reader_page.dart';
+import 'attachment_preview_page.dart';
 
 class PlayerPage extends StatefulWidget {
   const PlayerPage({
@@ -651,58 +650,26 @@ class _PlayerPageState extends State<PlayerPage> {
     _ => Icons.insert_drive_file_outlined,
   };
 
-  /// Attachment chip for a lesson doc; tap opens it ([_openDoc]), the
-  /// trailing button exports it through the native save dialog.
+  /// Attachment chip for a lesson doc; tap opens its preview — the PDF
+  /// kind in the reader, everything else in [AttachmentPreviewPage], where
+  /// the download/export actions live.
   Widget _docChip(
     BuildContext context,
     RelatedResource doc, {
     double iconSize = 16,
     double fontSize = 12,
   }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ActionChip(
-          avatar: Icon(
-            _iconFor(doc.format),
-            size: iconSize,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          label: Text(
-            doc.typeName ?? doc.format ?? doc.title,
-            style: TextStyle(fontSize: fontSize),
-          ),
-          onPressed: () => _openDoc(context, doc),
-        ),
-        IconButton(
-          tooltip: '下载',
-          visualDensity: VisualDensity.compact,
-          padding: const EdgeInsets.all(6),
-          constraints: const BoxConstraints(),
-          icon: Icon(
-            Icons.download_outlined,
-            size: iconSize + 4,
-            color: Theme.of(context).colorScheme.outline,
-          ),
-          onPressed: () => _downloadDoc(context, doc),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _downloadDoc(BuildContext context, RelatedResource doc) async {
-    if (doc.storages.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('该资源没有可用文件')));
-      return;
-    }
-    final proxy = context.read<StreamProxy>();
-    await exportFile(
-      context,
-      proxyUrl: proxy.fileUrl(doc.storages.first),
-      fileName: attachmentFileName(doc.title, doc.format),
-      mimeType: mimeForFormat(doc.format),
+    return ActionChip(
+      avatar: Icon(
+        _iconFor(doc.format),
+        size: iconSize,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      label: Text(
+        doc.typeName ?? doc.format ?? doc.title,
+        style: TextStyle(fontSize: fontSize),
+      ),
+      onPressed: () => _openDoc(context, doc),
     );
   }
 
@@ -723,50 +690,18 @@ class _PlayerPageState extends State<PlayerPage> {
       );
       return;
     }
-    // Non-PDF: fetch through the shared cache (one transfer per document,
-    // shared with the export flow) and hand to the system opener.
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('正在下载 ${doc.title} …')));
-    try {
-      final cached = await cachedDownload(url, upstreamOf(url)!);
-      final file = File(
-        '${(_isDesktop ? Directory.systemTemp : await _mobileDownloads()).path}/'
-        '${attachmentFileName(doc.title, doc.format)}',
-      );
-      await cached.copy(file.path);
-      if (_isDesktop) {
-        final opener = Platform.isMacOS
-            ? 'open'
-            : Platform.isLinux
-            ? 'xdg-open'
-            : 'cmd';
-        final args = Platform.isWindows
-            ? ['/c', 'start', '', file.path]
-            : [file.path];
-        await Process.run(opener, args);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('已保存到 ${file.path}')));
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('下载失败：$e')));
-      }
-    }
+    // Everything else previews in-page; its 导出保存 / 用系统程序打开
+    // actions live there, sharing the same cached bytes.
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AttachmentPreviewPage(
+          title: doc.title,
+          url: url,
+          format: doc.format,
+        ),
+      ),
+    );
   }
-}
-
-Future<Directory> _mobileDownloads() async {
-  // Android/iOS: cache directory is app-writable and user-reachable
-  // through files app on Android.
-  final base = Directory.systemTemp;
-  return base;
 }
 
 class _ErrorCard extends StatelessWidget {

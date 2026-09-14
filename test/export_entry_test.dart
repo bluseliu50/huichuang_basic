@@ -16,6 +16,7 @@ import 'package:huichuang_basic/src/stream/proxy.dart';
 import 'package:huichuang_basic/src/store/app_state.dart';
 import 'package:huichuang_basic/src/ui/pdf/pdf_reader_page.dart';
 import 'package:huichuang_basic/src/ui/pdf/textbooks_page.dart';
+import 'package:huichuang_basic/src/ui/player/attachment_preview_page.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -187,5 +188,48 @@ void main() {
     await tester.pump();
 
     expect(find.byTooltip('下载 PDF'), findsOneWidget);
+  });
+
+  testWidgets('attachment preview without cache shows the download error',
+      (tester) async {
+    // The binding's fake HttpClient fails the download into the error
+    // view; no export affordance without local bytes.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AttachmentPreviewPage(
+          title: '教学设计',
+          url: Uri.parse('http://127.0.0.1:1/file?u=hc_no_such_docx'),
+          format: 'docx',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('打开失败'), findsOneWidget);
+    expect(find.text('导出保存'), findsNothing);
+  });
+
+  testWidgets('attachment preview with a cached document offers both actions',
+      (tester) async {
+    final slot = cacheSlotFor(Uri.parse('hc_cached_docx'));
+    slot.parent.createSync(recursive: true);
+    slot.writeAsBytesSync(List.filled(2048, 3));
+    addTearDown(() {
+      try {
+        slot.deleteSync();
+      } catch (_) {}
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AttachmentPreviewPage(
+          title: '教学设计',
+          url: Uri.parse('http://127.0.0.1:1/file?u=hc_cached_docx'),
+          format: 'docx',
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('导出保存'), findsOneWidget);
+    // This host is a desktop, so the system-opener action shows too.
+    expect(find.text('用系统程序打开'), findsOneWidget);
   });
 }
