@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../download/download.dart';
+import '../export_file.dart';
+
 /// PDF reader for textbook pages and 课件 PDFs, streamed through the
 /// local auth-injecting proxy. Remembers the last page per document.
 ///
@@ -57,7 +60,21 @@ class _PdfReaderPageState extends State<PdfReaderPage> {
     // never shrink the reading area.
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            tooltip: '下载 PDF',
+            icon: const Icon(Icons.download_outlined),
+            onPressed: () => exportFile(
+              context,
+              proxyUrl: widget.url,
+              fileName: attachmentFileName(widget.title, 'pdf'),
+              mimeType: mimeForFormat('pdf'),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(

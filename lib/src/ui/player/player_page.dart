@@ -12,9 +12,11 @@ import 'package:window_manager/window_manager.dart';
 import '../../api/client.dart';
 import '../../api/models.dart';
 import '../../auth/auth_controller.dart';
+import '../../download/download.dart';
 import '../../store/app_state.dart';
 import '../../stream/proxy.dart';
 import '../breakpoints.dart';
+import '../export_file.dart';
 import '../login/login_card.dart';
 import '../pdf/pdf_reader_page.dart';
 
@@ -649,24 +651,58 @@ class _PlayerPageState extends State<PlayerPage> {
     _ => Icons.insert_drive_file_outlined,
   };
 
-  /// Attachment chip for a lesson doc; opens it through [_openDoc].
+  /// Attachment chip for a lesson doc; tap opens it ([_openDoc]), the
+  /// trailing button exports it through the native save dialog.
   Widget _docChip(
     BuildContext context,
     RelatedResource doc, {
     double iconSize = 16,
     double fontSize = 12,
   }) {
-    return ActionChip(
-      avatar: Icon(
-        _iconFor(doc.format),
-        size: iconSize,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-      label: Text(
-        doc.typeName ?? doc.format ?? doc.title,
-        style: TextStyle(fontSize: fontSize),
-      ),
-      onPressed: () => _openDoc(context, doc),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ActionChip(
+          avatar: Icon(
+            _iconFor(doc.format),
+            size: iconSize,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          label: Text(
+            doc.typeName ?? doc.format ?? doc.title,
+            style: TextStyle(fontSize: fontSize),
+          ),
+          onPressed: () => _openDoc(context, doc),
+        ),
+        IconButton(
+          tooltip: '下载',
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.all(6),
+          constraints: const BoxConstraints(),
+          icon: Icon(
+            Icons.download_outlined,
+            size: iconSize + 4,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          onPressed: () => _downloadDoc(context, doc),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _downloadDoc(BuildContext context, RelatedResource doc) async {
+    if (doc.storages.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('该资源没有可用文件')));
+      return;
+    }
+    final proxy = context.read<StreamProxy>();
+    await exportFile(
+      context,
+      proxyUrl: proxy.fileUrl(doc.storages.first),
+      fileName: attachmentFileName(doc.title, doc.format),
+      mimeType: mimeForFormat(doc.format),
     );
   }
 
